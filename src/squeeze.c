@@ -58,6 +58,30 @@
 static bool ctrlcpressed = FALSE; // CHECKS CTRL+C PRESSED DURING EXECUTION
 int oi_hush_errors = 0;           // flag for read_fits.c
 
+
+// MODIFIED
+//////////////////////////////////////////////////////
+/* PLSQUEEZE SPECIFIC: define extra parameters */
+int Nmode = 6; // number of modes
+int Nbase = 15; // number of baselines
+int Nresol = 65; // number of resolution elements (65x65)
+
+// baseline combinations
+int fullmodes1[15] = {0,0,0,0,0,1,1,2,2,3,1,1,2,3,4};
+int fullmodes2[15] = {1,2,3,4,5,3,4,4,5,5,2,5,3,4,5};
+
+// closure phase combinations
+int closurecomb1[20] = {0,0,0,0,1,1,1,2,2,3,10,10,10,5,5,6,12,12,7,13};
+int closurecomb2[20] = {10,5,6,11,12,7,8,13,9,14,12,7,8,13,9,14,13,9,14,14};
+int closurecomb3[20] = {1,2,3,4,2,3,4,3,4,4,5,6,11,6,11,11,7,8,8,9};
+
+double phaseshift; // phase shift between central core and the rest, if needed
+char matrix_filename[MAX_STRINGS]; // input pupil function matrix name
+double wavelength = 1.55e-6; // only works monochromatic.
+double telescope_diameter = 10.0;
+//////////////////////////////////////////////////////
+
+
 /* Global OIFITS variables */
 long nuv;
 char *oifits_file;
@@ -175,12 +199,73 @@ int main(int argc, char **argv) {
 
   // READ IN COMMAND LINE ARGUMENTS
 
+  // MODIFIED: read pupil function matrix file and phase shift
   if (read_commandline(&argc, argv, &benchmark, &use_v2, &use_t3amp, &use_t3phi, &use_visamp, &use_visphi, &diffvis, &use_tempfitswriting,
                        &use_bandwidthsmearing, &minimization_engine, &dumpchain, &mas_pixel, &axis_len, &depth, &niter, &nelements, &f_anywhere, &f_copycat,
                        &nchains, &nthreads, &tempschedc, &fov, &chi2_temp, &chi2_target, &tmin, &prob_auto, &uvtol, &output_filename[0], &init_filename[0],
-                       &prior_filename[0], &v2s, &v2a, &t3amps, &t3ampa, &t3phia, &t3phis, &visamps, &visampa, &visphis, &visphia, &fluxs, &cvfwhm, reg_param,
-                       init_params, &wavmin, &wavmax, &nwavr, &wavauto, &verbose_import) == FALSE)
+                       &prior_filename[0], &matrix_filename[0], &v2s, &v2a, &t3amps, &t3ampa, &t3phia, &t3phis, &visamps, &visampa, &visphis, &visphia, &fluxs, &cvfwhm, reg_param,
+                       init_params, &wavmin, &wavmax, &nwavr, &wavauto, &verbose_import, &phaseshift) == FALSE)
     return 0;
+
+
+  // MODIFIED
+  /////////////////////////////////////////////////////////
+  /* PLsqueeze specific : Read pupil functions */
+  printf("Read pupil functions fits file...\n");
+
+  int pstatus, pdummy_int, hdutype;
+  long pk;
+  fitsfile *pfptr;
+  char pdummy_char[MAX_STRINGS];
+  float pnullval;
+
+  printf("Try opening\n");
+  if (fits_open_file(&pfptr, matrix_filename, READONLY, &pstatus))
+    printerror(pstatus);
+  printf("FITS file opened\n");
+  if (fits_read_key_lng(pfptr, "NAXIS", &pk, pdummy_char, &pstatus))
+    printerror(pstatus);
+
+  printf("NAXIS keyword: %d\n", pk);  
+  double *pupil_function_real = NULL;
+  double *pupil_function_imag = NULL;
+  pupil_function_real = malloc(Nresol*Nresol*(Nmode + Nbase)*sizeof(double));
+  pupil_function_imag = malloc(Nresol*Nresol*(Nmode + Nbase)*sizeof(double));
+
+  if (fits_read_img(pfptr, TDOUBLE, 1, Nresol*Nresol*(Nmode + Nbase), &pnullval, pupil_function_real, &pdummy_int, &pstatus))
+    printerror(pstatus);
+  printf("Read 1st HDU\n");
+
+  if (fits_movabs_hdu(pfptr, 2, &hdutype, &pstatus))
+    printerror(pstatus);
+  if (fits_read_img(pfptr, TDOUBLE, 1, Nresol*Nresol*(Nmode + Nbase), &pnullval, pupil_function_imag, &pdummy_int, &pstatus))
+   printerror(pstatus);
+  printf("Read 2nd HDU\n");
+
+  // FILE *ptestfile = fopen("testout.txt","w");
+  int iiii;
+  double complex *pupilfunc = malloc(Nresol*Nresol*(Nmode + Nbase) * sizeof(double complex));
+  //printf("%d  %f\n", 600, pupil_function[600]);
+  printf("%d\n", pdummy_int);
+  printf("%f\n", pnullval);
+  for (iiii = 0; iiii < Nresol*Nresol*(Nmode + Nbase); ++iiii)
+  {
+    pupilfunc[iiii] = pupil_function_real[iiii] + I * pupil_function_imag[iiii];
+    // fprintf(ptestfile, "%d  %f + %fi\n", iiii, creal(pupilfunc[iiii]), cimag(pupilfunc[iiii]));
+  }
+    
+  // fclose(ptestfile);
+
+  fits_close_file(pfptr, &pstatus);
+
+
+  /* PLsqueeze specific : Field of view */
+  double imfov;
+  imfov = mas_pixel * axis_len;
+  printf("mas_pixel = %f mas, fov = %f arcsec, axis_len = %d\n", mas_pixel, imfov/1000, axis_len);
+  
+  /////////////////////////////////////////////////////////
+
 
   // Check nchains and nthreads are consistent, and if not overwrite them
   // First check if nchains and nthreads have been set
@@ -218,59 +303,83 @@ int main(int argc, char **argv) {
 
   fflush(stdout);
 
-  /* Read in oifits file */
 
-  if (import_single_epoch_oifits(argv[1], use_v2, use_t3amp, use_t3phi, use_visamp, use_visphi, v2a, v2s, t3ampa, t3amps, t3phia, t3phis, visampa, visamps,
-                                 visphia, visphis, fluxs, cvfwhm, uvtol, &nwavr, &wavmin, &wavmax, wavauto, timemin, timemax, verbose_import)) {
-    printf("Error opening %s. \n", argv[1]);
-    return 0;
-  }
-
+  // MODIFIED
+  /////////////////////////////////////////////////////////
+  /* PLsqueeze specific: read PL interferometry data */
   oifits_file = argv[1];
 
-  if (nuv == 0) {
-    printf("No usable data in OIFITS file.\nExiting...\n");
-    ctrlcpressed = TRUE;
-  }
-  fflush(stdout);
-
-  /* Initialise default values...(use multx,multy as temp variables)*/
-  /* Find longest (multx) and shortest (multy) baselines */
-  for (i = 0; i < nuv; ++i) {
-    dtemp = u[i] * u[i] + v[i] * v[i];
-    if (i == 0) {
-      multx = dtemp;
-      multy = dtemp;
-    } else {
-      if (dtemp > multx)
-        multx = dtemp;
-      if (dtemp < multy)
-        multy = dtemp;
-    }
-  }
-
-  multx = sqrt(multx);
-  multy = sqrt(multy);
-  if (mas_pixel == 0.0)
-    mas_pixel = MAS_RAD / multx / 6.; /* Default 6 pix per max baseline fringe */
-
-  if (axis_len == 0) {
-    axis_len = ceil(multx / multy * 6.); // we add a factor two for binaries which may not be centered
-    if (axis_len > 1024)
-      axis_len = 1024; /* This is a crazy image size...*/
+  if (import_PLfits(argv[1], v2a, v2s, t3phia, t3phis, visampa, visamps)){
+    printf("Error opening %s. \n", argv[1]);
+    return 0;
   }
 
   /* Number of elements depends on degrees of freedom and size of image */
   /* Completely empirical formula */
   if (nelements == 0) {
-    nelements = 2. * ceil(axis_len * pow(nv2 + nvisamp + nvisphi + nt3amp + nt3phi, 0.333));
+    nelements = 2. * ceil(axis_len * pow(6+15+10, 0.333));
     if (nelements < 500)
       nelements = 500;
   }
 
+  // /* Read in oifits file */
+
+  // if (import_single_epoch_oifits(argv[1], use_v2, use_t3amp, use_t3phi, use_visamp, use_visphi, v2a, v2s, t3ampa, t3amps, t3phia, t3phis, visampa, visamps,
+  //                                visphia, visphis, fluxs, cvfwhm, uvtol, &nwavr, &wavmin, &wavmax, wavauto, timemin, timemax, verbose_import)) {
+  //   printf("Error opening %s. \n", argv[1]);
+  //   return 0;
+  // }
+
+  // oifits_file = argv[1];
+
+  // if (nuv == 0) {
+  //   printf("No usable data in OIFITS file.\nExiting...\n");
+  //   ctrlcpressed = TRUE;
+  // }
+  // fflush(stdout);
+
+  // /* Initialise default values...(use multx,multy as temp variables)*/
+  // /* Find longest (multx) and shortest (multy) baselines */
+  // for (i = 0; i < nuv; ++i) {
+  //   dtemp = u[i] * u[i] + v[i] * v[i];
+  //   if (i == 0) {
+  //     multx = dtemp;
+  //     multy = dtemp;
+  //   } else {
+  //     if (dtemp > multx)
+  //       multx = dtemp;
+  //     if (dtemp < multy)
+  //       multy = dtemp;
+  //   }
+  // }
+
+  // multx = sqrt(multx);
+  // multy = sqrt(multy);
+  // if (mas_pixel == 0.0)
+  //   mas_pixel = MAS_RAD / multx / 6.; /* Default 6 pix per max baseline fringe */
+
+  // if (axis_len == 0) {
+  //   axis_len = ceil(multx / multy * 6.); // we add a factor two for binaries which may not be centered
+  //   if (axis_len > 1024)
+  //     axis_len = 1024; /* This is a crazy image size...*/
+  // }
+
+  // /* Number of elements depends on degrees of freedom and size of image */
+  // /* Completely empirical formula */
+  // if (nelements == 0) {
+  //   nelements = 2. * ceil(axis_len * pow(nv2 + nvisamp + nvisphi + nt3amp + nt3phi, 0.333));
+  //   if (nelements < 500)
+  //     nelements = 500;
+  // }
+
+  /////////////////////////////////////////////////////////
+
+
   printf("Reconst setup -- Baseline range:\t%ld - %ld wavelengths\n", (long)round(multy), (long)round(multx));
   printf("Reconst setup -- Pixel scale:   \t%lf mas/pixel\n", mas_pixel);
   printf("Reconst setup -- Image width:   \t%hu pixels\n", axis_len);
+  // MODIFIED
+  printf("Reconst setup -- Phase shift:   \t%lf rad\n", phaseshift);
 
   /* Initial/Starting image (command line -i)*/
   /* This can be either a command such as random that generates a random starting point */
@@ -528,7 +637,9 @@ int main(int argc, char **argv) {
   /* Set the derived parameters - number of degrees of freedom and the chi^2 for a random image... */
   /* Note that adding nparams to ndf is only valid if the parameters are free AND
    *    there is some a-priori information for each parameter in reg_value[REG_MODELPARAM]... */
-  ndf = (double)(nvisamp + nvisphi + nt3amp + nt3phi + nv2 + nparams_free);
+  // MODIFIED
+  ndf = (double)(6+15+20+nparams_free); 
+  // ndf = (double)(nvisamp + nvisphi + nt3amp + nt3phi + nv2 + nparams_free);
 
   //
   // MODIFICATIONS TO CENTERING
@@ -554,7 +665,9 @@ int main(int argc, char **argv) {
 
   printf("Reconst setup -- Degrees of freedom:\t%ld\n", (long)round(ndf));
 
-  flat_chi2 = get_flat_chi2(benchmark, nwavr);
+  // MODIFIED
+  flat_chi2 = get_flat_chi2(benchmark, nwavr, pupilfunc, axis_len, phaseshift);
+  // flat_chi2 = get_flat_chi2(benchmark, nwavr);
   printf("Reconst setup -- Chi2r random image:\t%lf\n", flat_chi2 / ndf);
 
   /* Print out important parameters */
@@ -574,24 +687,55 @@ int main(int argc, char **argv) {
    *    memory. */
   double complex *__restrict xtransform = malloc(axis_len * nuv * sizeof(double complex));
   double complex *__restrict ytransform = malloc(axis_len * nuv * sizeof(double complex));
-  for (k = 0; k < nuv; k++) {
-    // dtemp = exp ( -M_PI * M_PI / 4.0 / log ( 2 ) * ( u[k] * u[k] + v[k] * v[k] ) / MAS_RAD / MAS_RAD  * ( cvfwhm * cvfwhm ) );
+  
+  // MODIFIED
+  //////////////////////////////////////////////////
+  /* PL specific: define Fourier transform matrix specific for extended apertures*/
+  // define fftmatrix for extended apertures
+  // for 65x65 image, the dimension of matrix is 65^2 x 65^2
+  double complex *__restrict fftmatrix = malloc(axis_len * axis_len * axis_len * axis_len * sizeof(double complex));
 
-    if (use_bandwidthsmearing == TRUE) {
-      for (j = 0; j < axis_len; ++j) {
-        xtransform[j * nuv + k] = sinc(M_PI * uv_dlambda[k] / uv_lambda[k] * (j - axis_len / 2) * u[k] * mas_pixel / MAS_RAD) *
-                                  cexp(I * (j - axis_len / 2) * 2.0 * M_PI * u[k] * mas_pixel / MAS_RAD);
-        ytransform[j * nuv + k] = sinc(M_PI * uv_dlambda[k] / uv_lambda[k] * (j - axis_len / 2) * v[k] * mas_pixel / MAS_RAD) *
-                                  cexp(I * (j - axis_len / 2) * 2.0 * M_PI * -v[k] * mas_pixel / MAS_RAD);
-      }
-    } else {
-      for (j = 0; j < axis_len; ++j) {
+  // define fftfactor as the scaling factor
+  double fftfactor = 2.0 * telescope_diameter / wavelength * (imfov * 1e-3 / 206265.)* (floor(axis_len/2)/(floor(axis_len/2 +1))) * (axis_len-1) / axis_len;
 
-        xtransform[j * nuv + k] = cexp(I * (j - axis_len / 2) * 2.0 * M_PI * u[k] * mas_pixel / MAS_RAD);
-        ytransform[j * nuv + k] = cexp(I * (j - axis_len / 2) * 2.0 * M_PI * -v[k] * mas_pixel / MAS_RAD);
-      }
+  double step1 = 1.0 / (axis_len - 1);
+  double step2 = step1 * fftfactor;
+
+  // This giant matrix is just 2D fourier transform
+  for (int ind1=0; ind1 < axis_len*axis_len; ind1++){
+    for (int ind2=0; ind2 < axis_len*axis_len; ind2++){
+      int xxx = floor(ind1 / axis_len);
+      int yyy = ind1 % axis_len;
+      int iii = floor(ind2 / axis_len);
+      int jjj = ind2 % axis_len;
+      double xx = -0.5 + step1 * iii;
+      double yy = -0.5 + step1 * jjj;
+      double uu = -0.5*fftfactor + step2 * xxx;
+      double vv = -0.5*fftfactor + step2 * yyy;
+      fftmatrix[ind1*axis_len*axis_len + ind2] = cexp(I * 2.0 * M_PI * (uu * xx + vv * yy));
     }
   }
+  //////////////////////////////////////////////////
+  
+  // MODIFIED: don't need this anymore
+  // for (k = 0; k < nuv; k++) {
+  //   // dtemp = exp ( -M_PI * M_PI / 4.0 / log ( 2 ) * ( u[k] * u[k] + v[k] * v[k] ) / MAS_RAD / MAS_RAD  * ( cvfwhm * cvfwhm ) );
+
+  //   if (use_bandwidthsmearing == TRUE) {
+  //     for (j = 0; j < axis_len; ++j) {
+  //       xtransform[j * nuv + k] = sinc(M_PI * uv_dlambda[k] / uv_lambda[k] * (j - axis_len / 2) * u[k] * mas_pixel / MAS_RAD) *
+  //                                 cexp(I * (j - axis_len / 2) * 2.0 * M_PI * u[k] * mas_pixel / MAS_RAD);
+  //       ytransform[j * nuv + k] = sinc(M_PI * uv_dlambda[k] / uv_lambda[k] * (j - axis_len / 2) * v[k] * mas_pixel / MAS_RAD) *
+  //                                 cexp(I * (j - axis_len / 2) * 2.0 * M_PI * -v[k] * mas_pixel / MAS_RAD);
+  //     }
+  //   } else {
+  //     for (j = 0; j < axis_len; ++j) {
+
+  //       xtransform[j * nuv + k] = cexp(I * (j - axis_len / 2) * 2.0 * M_PI * u[k] * mas_pixel / MAS_RAD);
+  //       ytransform[j * nuv + k] = cexp(I * (j - axis_len / 2) * 2.0 * M_PI * -v[k] * mas_pixel / MAS_RAD);
+  //     }
+  //   }
+  // }
 
   // Shared OpenMP memory
 
@@ -622,13 +766,15 @@ int main(int argc, char **argv) {
 // omp_set_nested(1); // we allow nested parallelism, typical application is if you have a low number of chains and lots of CPU cores
 // Start nchains MCMC
 //
+// MODIFIED: included fftmatrix
 #pragma omp parallel private(i, j, k, w) shared(temperature, iChaintoStorage, iStoragetoChain, iMovedChain, burn_in_times, saved_x, saved_y,                   \
                                                 saved_lLikelihood, saved_lPosterior, saved_lPrior, saved_params, saved_reg_value, minimization_engine,         \
                                                 use_tempfitswriting, init_filename, ctrlcpressed, f_anywhere, f_copycat, prob_auto, tmin, chi2_target,         \
                                                 mas_pixel, niter, chi2_temp, flat_chi2, axis_len, lLikelihood_expectation, lLikelihood_deviation, nwavr,       \
                                                 nelements, nchains, tempschedc, uvwav2chan, uvtime2chan, nuv, nv2, nt3amp, nt3phi, nvisamp, nvisphi,           \
                                                 init_params, init_stepsize, initial_x, initial_y, reg_param, prior_image, cent_mult, fov, nparams,             \
-                                                xtransform, ytransform, ndf)
+                                                fftmatrix)
+                                                // xtransform, ytransform, ndf)
 #endif
   {
 /* The current system state */
@@ -670,24 +816,39 @@ int main(int argc, char **argv) {
     double *image = malloc(nwavr * axis_len * axis_len * sizeof(double));
     unsigned short *element_x = malloc(nwavr * nelements * sizeof(unsigned short));
     unsigned short *element_y = malloc(nwavr * nelements * sizeof(unsigned short));
-    double complex *im_vis = malloc(nuv * sizeof(double complex));
-    double complex *new_im_vis = malloc(nuv * sizeof(double complex));
-    double complex *new_mod_vis = malloc(nuv * sizeof(double complex));
-    double complex *mod_vis = malloc(nuv * sizeof(double complex));
-    double complex *param_vis = malloc(nuv * sizeof(double complex));
-    double complex *new_param_vis = malloc(nuv * sizeof(double complex));
+    
+    // MODIFIED
+    //////////////////////////////////////////////////////
+    /* PL specific: we compute mutual intensities in 2D grid. axis_len^2 instead of nuv*/
+    double complex *im_vis = malloc(axis_len*axis_len * sizeof(double complex));
+    double complex *new_im_vis = malloc(axis_len*axis_len * sizeof(double complex));
+    double complex *new_mod_vis = malloc(axis_len*axis_len * sizeof(double complex));
+    double complex *mod_vis = malloc(axis_len*axis_len * sizeof(double complex));
+    double complex *param_vis = malloc(axis_len*axis_len * sizeof(double complex));
+    double complex *new_param_vis = malloc(axis_len*axis_len * sizeof(double complex));
+    //////////////////////////////////////////////////////
+
     double *params = malloc(MAX_PARAMS * sizeof(double));
     double *new_params = malloc(MAX_PARAMS * sizeof(double));
     double *stepsize = malloc(MAX_PARAMS * sizeof(double));
     double *prob_pmovement = malloc(MAX_PARAMS * sizeof(double));
-    double *res = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double));     // current residuals
-    double *mod_obs = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double)); // current observables
+
+    // MODIFIED: for 6-port
+    double *res = calloc(6+15+20, sizeof(double));     // current residuals
+    double *mod_obs = calloc(6+15+20, sizeof(double)); // current observables
+    // double *res = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double));     // current residuals
+    // double *mod_obs = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double)); // current observables
+    
     double *centroid_image_x = malloc(nwavr * sizeof(double));
     double *centroid_image_y = malloc(nwavr * sizeof(double));
     double *reg_value = malloc(nwavr * NREGULS * sizeof(double));
     double *new_reg_value = malloc(nwavr * NREGULS * sizeof(double));
-    double *fluxratio_image = malloc(nuv * sizeof(double));
-    double *new_fluxratio_image = malloc(nuv * sizeof(double));
+
+    // MODIFIED: also in 2D grid instead of nuv
+    double *fluxratio_image = malloc(axis_len * axis_len * sizeof(double));
+    double *new_fluxratio_image = malloc(axis_len * axis_len * sizeof(double));
+
+
     unsigned short chain1, chain2;
     double logZ = 0; // chose to have logZ to be a private variable
     double logZ_err = 0;
@@ -742,11 +903,15 @@ int main(int argc, char **argv) {
     //
     // COMPUTE INITIAL VISIBILITIES
     //
-    compute_model_visibilities_fromelements(mod_vis, im_vis, param_vis, params, fluxratio_image, element_x, element_y, xtransform, ytransform,
-                                            &reg_value[REG_MODELPARAM], nparams, nelements);
+    // compute_model_visibilities_fromelements(mod_vis, im_vis, param_vis, params, fluxratio_image, element_x, element_y, xtransform, ytransform,
+    //                                         &reg_value[REG_MODELPARAM], nparams, nelements);
+    // MODIFIED
+    compute_model_visibilities_fromelements_PL(mod_vis, im_vis, param_vis, params, fluxratio_image, element_x, element_y, fftmatrix,
+                                            &reg_value[REG_MODELPARAM], nparams, nelements, axis_len);
 
     // Compute initial values for prior, likelihood, and posterior
-    compute_lLikelihood(&lLikelihood, mod_vis, res, mod_obs, &chi2v2, &chi2t3amp, &chi2visamp, &chi2t3phi, &chi2visphi, nwavr);
+    // MODIFIED
+    compute_lLikelihood_PL(&lLikelihood, mod_vis, res, mod_obs, &chi2v2, &chi2t3amp, &chi2visamp, &chi2t3phi, &chi2visphi, nwavr, pupilfunc, axis_len, phaseshift);
     compute_lPrior_allwav(&lPrior, nwavr, reg_param, reg_value);
     lPosterior = lLikelihood + lPrior;
     if (squeeze_quiet == FALSE)
@@ -1094,15 +1259,30 @@ int main(int argc, char **argv) {
 
         /* Modify the visibilities */
         //#pragma omp parallel for simd
-        for (j = 0; j < nuv; ++j) {
-          if (uvwav2chan[j] == chan) {
-            new_im_vis[j] = im_vis[j] +
-                            (xtransform[new_x * nuv + j] * ytransform[new_y * nuv + j] - xtransform[old_x * nuv + j] * ytransform[old_y * nuv + j]) *
-                                fluxratio_image[j] / (double)nelements;
-          } else
-            new_im_vis[j] = im_vis[j];
+
+        // MODIFIED
+        for (j = 0; j < axis_len*axis_len; j++){
+          //if (uvwav2chan[j] == chan){
+            //printf("Yes, change\n\n\n");
+            new_im_vis[j] = im_vis[j] - fftmatrix[j*axis_len*axis_len + old_y * axis_len + old_x]/ (double)nelements +
+                                        fftmatrix[j*axis_len*axis_len + new_y * axis_len + new_x]/ (double)nelements;
+          //} else {
+          //  new_im_vis[j] = im_vis[j];
+          //  printf("No, change\n\n\n");
+          //}
+            
           new_mod_vis[j] = new_im_vis[j] + param_vis[j];
         }
+
+        // for (j = 0; j < nuv; ++j) {
+        //   if (uvwav2chan[j] == chan) {
+        //     new_im_vis[j] = im_vis[j] +
+        //                     (xtransform[new_x * nuv + j] * ytransform[new_y * nuv + j] - xtransform[old_x * nuv + j] * ytransform[old_y * nuv + j]) *
+        //                         fluxratio_image[j] / (double)nelements;
+        //   } else
+        //     new_im_vis[j] = im_vis[j];
+        //   new_mod_vis[j] = new_im_vis[j] + param_vis[j];
+        // }
 
         prob_movement *= (1.0 - 1.0 / DAMPING_TIME);
 
@@ -1114,7 +1294,7 @@ int main(int argc, char **argv) {
         for (k = 0; k < nparams; k++)
           new_params[k] = params[k];
         new_params[j] = params[j] + stepsize[j] * (xstep * 2.0 - 1.0);
-        model_vis(new_params, new_param_vis, &new_reg_value[REG_MODELPARAM], new_fluxratio_image);
+        model_vis(new_params, new_param_vis, &new_reg_value[REG_MODELPARAM], new_fluxratio_image, axis_len);
         prob_pmovement[j] *= 1.0 - 1.0 / PARAM_DAMPING_TIME;
         stepsize[j] *= 1.0 + (prob_pmovement[j] - TARGET_MPROB) / STEPSIZE_ADJUST_TIME;
         for (j = 0; j < nuv; ++j)
@@ -1128,7 +1308,8 @@ int main(int argc, char **argv) {
       // Evaluate posterior probability
       //
 
-      compute_lLikelihood(&new_lLikelihood, new_mod_vis, res, mod_obs, &chi2v2, &chi2t3amp, &chi2visamp, &chi2t3phi, &chi2visphi, nwavr);
+      // MODIFIED
+      compute_lLikelihood_PL(&new_lLikelihood, new_mod_vis, res, mod_obs, &chi2v2, &chi2t3amp, &chi2visamp, &chi2t3phi, &chi2visphi, nwavr, pupilfunc, axis_len, phaseshift);
       compute_lPrior_allwav(&lPrior, nwavr, reg_param, reg_value);
       compute_lPrior_allwav(&new_lPrior, nwavr, reg_param, new_reg_value);
       new_lPosterior = new_lLikelihood + new_lPrior;
@@ -1178,7 +1359,8 @@ int main(int argc, char **argv) {
           /* Swap params and new_params */
           params[j] = new_params[j];
           /* Update fluxratio_image and reg_value[REG_MODELPARAM] */
-          for (k = 0; k < nuv; ++k)
+          // MODIFIED: nuv to axis_len*axis_len
+          for (k = 0; k < axis_len* axis_len; ++k)
             fluxratio_image[k] = new_fluxratio_image[k];
           reg_value[REG_MODELPARAM] = new_reg_value[REG_MODELPARAM];
         }
@@ -1358,10 +1540,11 @@ int main(int argc, char **argv) {
         if (burn_in_times[i] < (niter - depth))
           burn_in_times[i] = niter - depth; // note: we previously ensured depth <= niter so this is safe
       }
-
-      mcmc_results(minimization_engine, output_filename, nchains, burn_in_times, depth, nelements, axis_len, xtransform, ytransform, saved_x, saved_y,
+      
+      // MODIFIED
+      mcmc_results(minimization_engine, output_filename, nchains, burn_in_times, depth, nelements, axis_len, xtransform, ytransform, fftmatrix, saved_x, saved_y,
                    saved_params, niter, nwavr, final_params, final_params_std, reg_param, final_reg_value, prior_image, initial_x, initial_y, centroid_image_x,
-                   centroid_image_y, fov, cent_mult, ndf, tmin, chi2_temp, chi2_target, mas_pixel, init_filename, prior_filename, 0, 0);
+                   centroid_image_y, fov, cent_mult, ndf, tmin, chi2_temp, chi2_target, mas_pixel, init_filename, prior_filename, 0, 0, pupilfunc, phaseshift);
 
     } else // (minimization_engine == ENGINE_PARALLEL_TEMPERING)
     {
@@ -1369,9 +1552,10 @@ int main(int argc, char **argv) {
       compute_logZ(temperature, iStoragetoChain, lLikelihood_expectation, lLikelihood_deviation, nchains, &logZ, &logZe);
       printf("Output -- Final logZ: %f +/- %f\n", logZ, logZe);
       burn_in_times[0] = ceil(0.3 * niter);
-      mcmc_results(minimization_engine, output_filename, nchains, burn_in_times, depth, nelements, axis_len, xtransform, ytransform, saved_x, saved_y,
+      // MODIFIED
+      mcmc_results(minimization_engine, output_filename, nchains, burn_in_times, depth, nelements, axis_len, xtransform, ytransform, fftmatrix, saved_x, saved_y,
                    saved_params, niter, nwavr, final_params, final_params_std, reg_param, final_reg_value, prior_image, initial_x, initial_y, centroid_image_x,
-                   centroid_image_y, fov, cent_mult, ndf, tmin, chi2_temp, chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe);
+                   centroid_image_y, fov, cent_mult, ndf, tmin, chi2_temp, chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe, pupilfunc, phaseshift);
     }
 
     if (dumpchain == TRUE)
@@ -1408,8 +1592,9 @@ int main(int argc, char **argv) {
   free(iChaintoStorage);
   free(iStoragetoChain);
   free(iMovedChain);
-  free(xtransform);
-  free(ytransform);
+  // MODIFIED: maybe don't need to free this?
+  // free(xtransform);
+  // free(ytransform);
   free(visin);
   free(v2in);
   free(t3in1);
@@ -1434,7 +1619,8 @@ int main(int argc, char **argv) {
   free(initial_y);
   free(prior_image);
   return 0;
-}
+  printf("myprint MAIN endeed!");
+} // maybe this is the end of main loop
 
 /*****************************************************/
 /* Print out cfitsio error messages and exit program */
@@ -1548,80 +1734,207 @@ void printhelp(void) {
 /**********************************************************************/
 /* Calculate complex vis chi^2 taking into account the known_phases   */
 /**********************************************************************/
-void compute_lLikelihood(double *likelihood, const double complex *__restrict mod_vis, double *__restrict res, double *__restrict mod_obs, double *chi2v2,
-                         double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi, const int nwavr) {
-  vis_to_obs(mod_vis, mod_obs, nwavr);
-  obs_to_res(mod_obs, res);
-  *likelihood = 0.5 * residuals_to_chi2(res, chi2v2, chi2t3amp, chi2visamp, chi2t3phi, chi2visphi);
+// void compute_lLikelihood(double *likelihood, const double complex *__restrict mod_vis, double *__restrict res, double *__restrict mod_obs, double *chi2v2,
+//                          double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi, const int nwavr) {
+//   vis_to_obs(mod_vis, mod_obs, nwavr);
+//   obs_to_res(mod_obs, res);
+//   *likelihood = 0.5 * residuals_to_chi2(res, chi2v2, chi2t3amp, chi2visamp, chi2t3phi, chi2visphi);
+// }
+
+// MODIFIED
+void compute_lLikelihood_PL(double *likelihood, const double complex *__restrict mod_vis, double *__restrict res, double *__restrict mod_obs, double *chi2v2,
+                         double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi, const int nwavr, double complex *pupilfunc, int axis_len, double phaseshift) {
+  vis_to_obs_PL(mod_vis, mod_obs, nwavr, pupilfunc, axis_len, phaseshift);
+  obs_to_res_PL(mod_obs, res);
+  *likelihood = 0.5 * residuals_to_chi2_PL(res, chi2v2, chi2t3amp, chi2visamp, chi2t3phi, chi2visphi);
 }
 
-void vis_to_obs(const double complex *__restrict mod_vis, double *__restrict mod_obs, const int nwavr) {
-  register long i, k;
-  double complex modt3;
-  const long t3ampoffset = nv2;
-  const long visampoffset = nv2 + nt3amp;
-  const long t3phioffset = nv2 + nt3amp + nvisamp;
-  const long visphioffset = nv2 + nt3amp + nvisamp + nt3phi;
+// void vis_to_obs(const double complex *__restrict mod_vis, double *__restrict mod_obs, const int nwavr) {
+//   register long i, k;
+//   double complex modt3;
+//   const long t3ampoffset = nv2;
+//   const long visampoffset = nv2 + nt3amp;
+//   const long t3phioffset = nv2 + nt3amp + nvisamp;
+//   const long visphioffset = nv2 + nt3amp + nvisamp + nt3phi;
 
-  //#pragma omp for simd
-  for (i = 0; i < nv2; ++i)
-    mod_obs[i] = modsq(mod_vis[v2in[i]]);
+//   //#pragma omp for simd
+//   for (i = 0; i < nv2; ++i)
+//     mod_obs[i] = modsq(mod_vis[v2in[i]]);
 
-  //#pragma omp for simd
-  for (i = 0; i < nt3; ++i) {
-    modt3 = mod_vis[t3in1[i]] * mod_vis[t3in2[i]] * conj(mod_vis[t3in3[i]]);
+//   //#pragma omp for simd
+//   for (i = 0; i < nt3; ++i) {
+//     modt3 = mod_vis[t3in1[i]] * mod_vis[t3in2[i]] * conj(mod_vis[t3in3[i]]);
 
-    if (i < nt3amp) // as many instruments only have closure phases, useful check to gain cycles
-      if (data_err[t3ampoffset + i] > 0)
-        mod_obs[t3ampoffset + i] = cabs(modt3);
+//     if (i < nt3amp) // as many instruments only have closure phases, useful check to gain cycles
+//       if (data_err[t3ampoffset + i] > 0)
+//         mod_obs[t3ampoffset + i] = cabs(modt3);
 
-    if (i < nt3phi)
-      if (data_err[t3phioffset + i] > 0)
-        // mod_obs[t3phioffset + i] = xatan2(cimag(modt3), creal(modt3));
-        mod_obs[t3phioffset + i] = carg(modt3);
-  }
+//     if (i < nt3phi)
+//       if (data_err[t3phioffset + i] > 0)
+//         // mod_obs[t3phioffset + i] = xatan2(cimag(modt3), creal(modt3));
+//         mod_obs[t3phioffset + i] = carg(modt3);
+//   }
 
-  if (nvisamp > 0)
-    //#pragma omp for simd
-    for (i = 0; i < nvisamp; ++i)
-      if (data_err[visampoffset + i] > 0)
-        mod_obs[visampoffset + i] = cabs(mod_vis[visin[i]]);
+//   if (nvisamp > 0)
+//     //#pragma omp for simd
+//     for (i = 0; i < nvisamp; ++i)
+//       if (data_err[visampoffset + i] > 0)
+//         mod_obs[visampoffset + i] = cabs(mod_vis[visin[i]]);
 
-  if (nvisphi > 0) {
-    //#pragma omp for simd
-    // first we compute the raw vis
-    // complex visibilities
-    if (diffvis == FALSE) {
-      for (i = 0; i < nvisphi; ++i)
-        if (data_err[visphioffset + i] > 0)
-          mod_obs[visphioffset + i] = carg(mod_vis[visin[i]]);
-    } else {
-      double ref_chan;
-      for (i = 0; i < nvisphi; ++i) {
-        ref_chan = 0;
-        for (k = 0; k < nwavr; k++) // annoying: differential vis require the original number of spectral channels -- need to check that
-        {
-          if (dvisindx[i][k] != -1)
-            ref_chan += carg(mod_vis[dvisindx[i][k]]);
-        }
-        ref_chan /= (double)dvisnwav[i];
-        //    printf("Point: %ld index: %ld ref_chan: %lf navg: %d \n", i, visin[i], ref_chan, dvisnwav[i]);
-        mod_obs[visphioffset + i] = carg(mod_vis[visin[i]]) - ref_chan;
-      }
+//   if (nvisphi > 0) {
+//     //#pragma omp for simd
+//     // first we compute the raw vis
+//     // complex visibilities
+//     if (diffvis == FALSE) {
+//       for (i = 0; i < nvisphi; ++i)
+//         if (data_err[visphioffset + i] > 0)
+//           mod_obs[visphioffset + i] = carg(mod_vis[visin[i]]);
+//     } else {
+//       double ref_chan;
+//       for (i = 0; i < nvisphi; ++i) {
+//         ref_chan = 0;
+//         for (k = 0; k < nwavr; k++) // annoying: differential vis require the original number of spectral channels -- need to check that
+//         {
+//           if (dvisindx[i][k] != -1)
+//             ref_chan += carg(mod_vis[dvisindx[i][k]]);
+//         }
+//         ref_chan /= (double)dvisnwav[i];
+//         //    printf("Point: %ld index: %ld ref_chan: %lf navg: %d \n", i, visin[i], ref_chan, dvisnwav[i]);
+//         mod_obs[visphioffset + i] = carg(mod_vis[visin[i]]) - ref_chan;
+//       }
+//     }
+//   }
+// }
+
+void vis_to_obs_PL(const double complex *__restrict mod_vis, double *__restrict mod_obs, const int nwavr, double complex *pupilfunc, int axis_len, double phaseshift) {
+  
+  // Let's compute visibilities from imgJ (mod_vis)!
+  // mod_vis has axis_len**2 dimension.
+  // weight this by pupil functions!
+  // then sum over everything
+
+  //double complex *plvis = (double complex *)malloc(15 * sizeof(double complex));
+  //double complex *plvis_norm = (double complex *)malloc(6 * sizeof(double complex));
+  double complex plvis[15];
+  double complex plvis_norm[6];
+
+  // printf("trying to malloc plvis\n\n");
+  //FILE *ptestfile = fopen("visibilitytest.txt","w");
+  // printf("we are computing vis2obs\n");
+  for (int ind=0; ind < 6; ind++){
+    plvis_norm[ind] = 0.0 + 0.0*I;
+    //printf("start ind = %d", ind);
+    for (int ii=0; ii < axis_len * axis_len; ii++){
+      //printf("Computing %d, %d\n", ind, ii);
+      //if (mod_vis[ii] != 0.0)
+      //  printf("nonzero mod-vis!\n");
+      //printf("pupilfunc and modvis %f, %f\n", creal(pupilfunc[(ind)*axis_len*axis_len + ii]), creal(mod_vis[ii]));
+      plvis_norm[ind] += pupilfunc[ind * axis_len * axis_len + ii] * mod_vis[ii] / (double)axis_len / (double)axis_len;
     }
+    //fprintf(ptestfile, "plvis_norm[%d] = %f + %fi\n", ind, creal(plvis_norm[ind]), cimag(plvis_norm[ind]));
+    //printf("plvis_norm %f", plvis_norm[ind]);
+  }
+  
+  
+  for (int ind=0; ind < 15; ind++){
+    plvis[ind] = 0.0 + 0.0*I;
+    //fprintf(ptestfile, "initial value %f, %f\n", creal(plvis[ind]), cimag(plvis[ind]));
+    for (int ii=0; ii < axis_len * axis_len; ii++){
+      //fprintf(ptestfile, "pupilfunc and modvis %f, %f\n", creal((double complex)pupilfunc[(6+ind)*axis_len*axis_len + ii] * (double complex)mod_vis[ii]), cimag((double complex)pupilfunc[(6+ind)*axis_len*axis_len + ii] * (double complex)mod_vis[ii]));
+      plvis[ind] += (double complex)pupilfunc[(6+ind)*axis_len*axis_len + ii] * (double complex)mod_vis[ii] / (double)axis_len / (double)axis_len;
+    }
+    if (fullmodes1[ind] == 0)
+      plvis[ind] *= cexp(I * phaseshift);
+    //fprintf(ptestfile, "plvis[%d] = %.15f + %.15fi\n", ind, creal(plvis[ind]), cimag(plvis[ind]));
+  }
+
+
+  // for (int ind=0; ind < 15; ind++){
+  // //  printf("Unnormalized PL visibility real part %d: %.10f\n", ind, plvis[ind]);
+  //   fprintf(ptestfile, "Unnormalized PL visibility real part %d: %.10f\n", ind, plvis[ind]);
+  // }
+  
+  for (int ind=0; ind < 15; ind++){
+    double conj1 = pow(pow(creal(plvis_norm[fullmodes1[ind]]), 2) +  pow(cimag(plvis_norm[fullmodes1[ind]]), 2), 0.5);
+    double conj2 = pow(pow(creal(plvis_norm[fullmodes2[ind]]), 2) +  pow(cimag(plvis_norm[fullmodes2[ind]]), 2), 0.5);
+    //fprintf(ptestfile, "plvis, conj1 , conj2 = %f + %fi, %f, %f\n", creal(plvis[ind]), cimag(plvis[ind]), conj1, conj2);
+    plvis[ind] /= (double)pow((conj1 * conj2), 0.5);
+    //printf("Print out PL visibilities. %d : %.10f + %.10f i\n", ind, creal(plvis[ind]), cimag(plvis[ind]));
+    //fprintf(ptestfile, "Print out PL visibilities. ind %d (%d, %d): %.10f + %.10f i\n", ind, fullmodes1[ind], fullmodes2[ind], creal(plvis[ind]), cimag(plvis[ind]));
+  }
+  //
+
+
+  double total_intensity;
+  register long i;
+
+  for (int ii=0; ii<6; ++ii)
+    total_intensity += plvis_norm[ii];
+
+  ///////////////////////// Using all six intensities !!
+  for (i=0; i<6; ++i){
+    mod_obs[i] = plvis_norm[i] / (double)total_intensity;
+    //fprintf(ptestfile, "Intensity normalized. %.10f\n", mod_obs[i]);
+  }
+
+  // for (i=0; i<5; ++i){
+  //   mod_obs[i+1] = plvis_norm[i+1] / (double)total_intensity;
+  // }
+
+  for (i=0; i<15; ++i){
+    mod_obs[i+6] = cabs(plvis[i]); //pow(pow(creal(plvis[i]), 2) + pow(cimag(plvis[i]), 2) , 0.5);
+    //fprintf(ptestfile, "Squared visibility. %f\n", mod_obs[i+6]);
+  }
+
+  for (i=0; i<20; ++i){
+    double complex bi = plvis[closurecomb1[i]] * plvis[closurecomb2[i]] * (creal(plvis[closurecomb3[i]]) - I * cimag(plvis[closurecomb3[i]]));
+
+    mod_obs[i+6+15] = carg(bi);
+    //fprintf(ptestfile, "Closure phase. %f\n", mod_obs[i+6+15]);
+  
   }
 }
 
-void obs_to_res(const double *__restrict mod_obs, double *__restrict res) {
+void obs_to_res_PL(const double *__restrict mod_obs, double *__restrict res) {
   long i;
   //#pragma omp parallel for simd
-  for (i = 0; i < nv2 + nt3amp + nvisamp; ++i) {
-    res[i] = (mod_obs[i] - data[i]) * data_err[i];
+  for (i = 0; i < 6+15+20; ++i) {
+    res[i] = (mod_obs[i] - data[i]) / data_err[i];
+  }
+}
+
+// void obs_to_res(const double *__restrict mod_obs, double *__restrict res) {
+//   long i;
+//   //#pragma omp parallel for simd
+//   for (i = 0; i < nv2 + nt3amp + nvisamp; ++i) {
+//     res[i] = (mod_obs[i] - data[i]) * data_err[i];
+//   }
+
+//   // #pragma omp parallel for simd
+//   for (i = nv2 + nt3amp + nvisamp; i < nv2 + nt3amp + nvisamp + nt3phi + nvisphi; ++i)
+//     res[i] = dewrap(mod_obs[i] - data[i]) * data_err[i]; // TBD: improve wrapping
+// }
+
+// MODIFIED
+double residuals_to_chi2_PL(const double *res, double *chi2v2, double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi) {
+  long i;
+  double temp1 = 0, temp2 = 0, temp3 = 0, temp4 = 0, temp5 = 0; // local accumulator (faster than using chi2)
+
+  for (i=0; i<6+15+20; ++i){
+    temp1 += res[i] * res[i];
   }
 
-  // #pragma omp parallel for simd
-  for (i = nv2 + nt3amp + nvisamp; i < nv2 + nt3amp + nvisamp + nt3phi + nvisphi; ++i)
-    res[i] = dewrap(mod_obs[i] - data[i]) * data_err[i]; // TBD: improve wrapping
+  for (i=6; i < 6+15; ++i){
+    temp2 += res[i] * res[i];
+  }
+  *chi2v2 = temp2;
+
+  for (i=6+15; i < 6+15+20; ++i){
+    temp3 += res[i] * res[i];
+  }
+  *chi2t3phi = temp3;
+
+  return temp1;
 }
 
 double residuals_to_chi2(const double *res, double *chi2v2, double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi) {
@@ -1688,16 +2001,18 @@ static inline double modsq(double complex input) // __attribute__((always_inline
 /**********************************************************/
 /* Calculate chi^2 for a flat image (for reference)       */
 /**********************************************************/
-double get_flat_chi2(bool benchmark, const int nwavr) {
+// MODIFIED
+double get_flat_chi2(bool benchmark, const int nwavr, double complex *pupilfunc, long axis_len, double phaseshift) {
   long i, rlong, nbench;
   double dummy1, dummy2, dummy3, dummy4, dummy5, startTime, endTime;
-  double complex *mod_vis = malloc(nuv * sizeof(double complex));
-  double *res = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double));     // current residuals
-  double *mod_obs = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double)); // current observables
+  double complex *mod_vis = malloc(axis_len * axis_len * sizeof(double complex));
+  double *res = calloc((6+15+20), sizeof(double));     // current residuals
+  double *mod_obs = calloc((6+15+20), sizeof(double)); // current observables
   RngStream rngflat = RngStream_CreateStream("flatchi2");
-  for (i = 0; i < nuv; ++i) {
+  for (i = 0; i < axis_len*axis_len; ++i) {
     rlong = RngStream_RandInt(rngflat, 0, 2147483647);
     mod_vis[i] = cexp(-10.0 + I * (rlong % 1000) * 0.006283);
+    
   }
 
   if (benchmark == TRUE) {
@@ -1710,7 +2025,8 @@ double get_flat_chi2(bool benchmark, const int nwavr) {
   double flat_chi2 = 0;
   startTime = (double)clock() / CLOCKS_PER_SEC;
   for (i = 0; i < nbench; ++i)
-    compute_lLikelihood(&flat_chi2, mod_vis, res, mod_obs, &dummy1, &dummy2, &dummy3, &dummy4, &dummy5, nwavr);
+    //MODIFIED
+    compute_lLikelihood_PL(&flat_chi2, mod_vis, res, mod_obs, &dummy1, &dummy2, &dummy3, &dummy4, &dummy5, nwavr, pupilfunc, axis_len, phaseshift);
 
   endTime = (double)clock() / CLOCKS_PER_SEC;
   if (benchmark == TRUE)
@@ -2124,13 +2440,14 @@ void mcmc_fullchain(char *file, long nchains, long niter, int nwavr, long neleme
 // Recompute observables, chi2, regularizers from input image
 // then dump the info into .fits (+headers) and .data files
 //
+// MODIFIED: PL
 void mcmc_writeoutput(char *file_basename, double *image, const int nchains, const int nrealizations, const unsigned int *burn_in_times, const long depth,
                       const long nelements, const unsigned short axis_len, const double complex *__restrict xtransform,
-                      const double complex *__restrict ytransform, const unsigned short *saved_x, const unsigned short *saved_y, const double *saved_params,
+                      const double complex *__restrict ytransform, const double complex *fftmatrix, const unsigned short *saved_x, const unsigned short *saved_y, const double *saved_params,
                       const long niter, const int nwavr, double *params, double *params_std, double *reg_param, double *reg_value, const double *prior_image,
                       const unsigned short *initial_x, const unsigned short *initial_y, double *centroid_image_x, double *centroid_image_y, const double fov,
                       const double cent_mult, const int ndf, double tmin, double chi2_temp, double chi2_target, double mas_pixel, char *init_filename,
-                      char *prior_filename, double logZ, double logZe) {
+                      char *prior_filename, double logZ, double logZe, double complex *pupilfunc, double phaseshift) {
   int i, j;
   // debug
 
@@ -2148,47 +2465,65 @@ void mcmc_writeoutput(char *file_basename, double *image, const int nchains, con
   // Recompute observables
   //
 
-  double complex *mod_vis = malloc(nuv * sizeof(double complex));
-  double complex *im_vis = malloc(nuv * sizeof(double complex));
-  double complex *param_vis = malloc(nuv * sizeof(double complex));
-  double *fluxratio_image = malloc(nuv * sizeof(double));
+  // double complex *mod_vis = malloc(nuv * sizeof(double complex));
+  // double complex *im_vis = malloc(nuv * sizeof(double complex));
+  // double complex *param_vis = malloc(nuv * sizeof(double complex));
+  // double *fluxratio_image = malloc(nuv * sizeof(double));
+  // double lPriorModel = 0;
+
+  // MODIFIED
+  double complex *mod_vis = malloc(axis_len*axis_len * sizeof(double complex));
+  double complex *im_vis = malloc(axis_len*axis_len * sizeof(double complex));
+  double complex *param_vis = malloc(axis_len*axis_len * sizeof(double complex));
+  double *fluxratio_image = malloc(axis_len * axis_len * sizeof(double));
   double lPriorModel = 0;
 
   // note: compute_model_visibilities_fromimage takes normalized images
-  compute_model_visibilities_fromimage(mod_vis, im_vis, param_vis, params, fluxratio_image, image, xtransform, ytransform, &lPriorModel, nparams, nelements,
+  // MODIFIED: PL
+  compute_model_visibilities_fromimage_PL(mod_vis, im_vis, param_vis, params, fluxratio_image, image, xtransform, ytransform, fftmatrix, &lPriorModel, nparams, nelements,
                                        axis_len);
 
-  double *res = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double));     // current residuals
-  double *mod_obs = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double)); // current observables
+  // MODIFIED
+  double *res = calloc((41), sizeof(double));     // current residuals
+  double *mod_obs = calloc((41), sizeof(double)); // current observables
+  // double *res = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double));     // current residuals
+  // double *mod_obs = calloc((nv2 + nt3amp + nt3phi + nvisamp + nvisphi), sizeof(double)); // current observables
 
   // compute chi2s on final image
   double chi2 = 0, chi2v2 = 0, chi2t3amp = 0, chi2visamp = 0, chi2t3phi = 0, chi2visphi = 0;
 
-  compute_lLikelihood(&chi2, mod_vis, res, mod_obs, &chi2v2, &chi2t3amp, &chi2visamp, &chi2t3phi, &chi2visphi, nwavr);
+  // MODIFIED
+  compute_lLikelihood_PL(&chi2, mod_vis, res, mod_obs, &chi2v2, &chi2t3amp, &chi2visamp, &chi2t3phi, &chi2visphi, nwavr, pupilfunc, axis_len, phaseshift);
   chi2 *= 2.;
-  if (nv2 > 0)
-    chi2v2 /= (double)nv2;
-  if (nt3amp > 0)
-    chi2t3amp /= (double)nt3amp;
-  if (nt3phi > 0)
-    chi2t3phi /= (double)nt3phi;
-  if (nvisamp > 0)
-    chi2visamp /= (double)nvisamp;
-  if (nvisphi > 0)
-    chi2visphi /= (double)nvisphi;
+  chi2v2 /= (double)15;
+  chi2visphi /= (double)20;
+
+  // if (nv2 > 0)
+  //   chi2v2 /= (double)nv2;
+  // if (nt3amp > 0)
+  //   chi2t3amp /= (double)nt3amp;
+  // if (nt3phi > 0)
+  //   chi2t3phi /= (double)nt3phi;
+  // if (nvisamp > 0)
+  //   chi2visamp /= (double)nvisamp;
+  // if (nvisphi > 0)
+  //   chi2visphi /= (double)nvisphi;
 
   printf("Output -- %20s\tNframes: %d Chi2r: %lf ", file_basename, nrealizations, chi2 / ndf);
 
-  if (nv2 > 0)
-    printf(TEXT_COLOR_RED "V2:%5.2f " TEXT_COLOR_BLACK, chi2v2);
-  if (nt3amp > 0)
-    printf(TEXT_COLOR_BLUE "T3A:%5.2f " TEXT_COLOR_BLACK, chi2t3amp);
-  if (nt3phi > 0)
-    printf(TEXT_COLOR_GREEN "T3P:%5.2f " TEXT_COLOR_BLACK, chi2t3phi);
-  if (nvisamp > 0)
-    printf(TEXT_COLOR_CYAN "VA:%5.2f " TEXT_COLOR_BLACK, chi2visamp);
-  if (nvisphi > 0)
-    printf(TEXT_COLOR_MAGENTA "VP:%5.2f " TEXT_COLOR_BLACK, chi2visphi);
+  // MODIFIED
+  printf(TEXT_COLOR_RED "V2:%5.2f " TEXT_COLOR_BLACK, chi2v2); 
+  printf(TEXT_COLOR_GREEN "T3P:%5.2f " TEXT_COLOR_BLACK, chi2t3phi); 
+  // if (nv2 > 0)
+  //   printf(TEXT_COLOR_RED "V2:%5.2f " TEXT_COLOR_BLACK, chi2v2);
+  // if (nt3amp > 0)
+  //   printf(TEXT_COLOR_BLUE "T3A:%5.2f " TEXT_COLOR_BLACK, chi2t3amp);
+  // if (nt3phi > 0)
+  //   printf(TEXT_COLOR_GREEN "T3P:%5.2f " TEXT_COLOR_BLACK, chi2t3phi);
+  // if (nvisamp > 0)
+  //   printf(TEXT_COLOR_CYAN "VA:%5.2f " TEXT_COLOR_BLACK, chi2visamp);
+  // if (nvisphi > 0)
+  //   printf(TEXT_COLOR_MAGENTA "VP:%5.2f " TEXT_COLOR_BLACK, chi2visphi);
   printf("\n");
   //
   // Output observables and residuals into a .data file
@@ -2197,19 +2532,36 @@ void mcmc_writeoutput(char *file_basename, double *image, const int nchains, con
   // if(output_to_file)
   //  {
 
+  // MODIFIED: another diagnostic output file
+  char data2_filename[MAX_STRINGS];
+  sprintf(data2_filename, "%s_vis.data", file_basename);
+  FILE *pFile2 = fopen(data2_filename, "w");
+  for (i = 0; i < axis_len * axis_len; ++i)
+    fprintf(pFile2, "%lf %lf %lf %lf %lf %lf %lf\n", creal(mod_vis[i]), creal(im_vis[i]), creal(param_vis[i]), fluxratio_image[i],
+    cimag(mod_vis[i]), cimag(im_vis[i]), cimag(param_vis[i]));
+  fclose(pFile2);
+
   char data_filename[MAX_STRINGS];
   sprintf(data_filename, "%s.data", file_basename);
   FILE *pFile = fopen(data_filename, "w");
-  fprintf(pFile, "%lf %lf %lf %lf\n", (double)nuv, (double)nv2, (double)nt3amp, (double)nvisamp);
-  fprintf(pFile, "%lf %lf %lf %lf\n", (double)nt3phi, (double)nt3, (double)nvisphi, (double)nwavr);
-  for (i = 0; i < nuv; ++i)
-    fprintf(pFile, "%lf %lf %lf %lf\n", u[i], v[i], uv_lambda[i] * 1E6, uv_dlambda[i] * 1E6);
-  for (i = 0; i < nt3; ++i)
-    fprintf(pFile, "%lf %lf %lf %lf\n", (double)(t3in1[i]), (double)(t3in2[i]), (double)(t3in3[i]), 0.0);
-  for (i = 0; i < nv2 + nt3amp + nvisamp + nt3phi + nvisphi; ++i)
+  for (i = 0; i < 6+15+20; ++i)
     fprintf(pFile, "%lf %lf %lf %lf\n", mod_obs[i], data[i], data_err[i], res[i]);
   fclose(pFile);
-  // }
+
+
+  // char data_filename[MAX_STRINGS];
+  // sprintf(data_filename, "%s.data", file_basename);
+  // FILE *pFile = fopen(data_filename, "w");
+  // fprintf(pFile, "%lf %lf %lf %lf\n", (double)nuv, (double)nv2, (double)nt3amp, (double)nvisamp);
+  // fprintf(pFile, "%lf %lf %lf %lf\n", (double)nt3phi, (double)nt3, (double)nvisphi, (double)nwavr);
+  // for (i = 0; i < nuv; ++i)
+  //   fprintf(pFile, "%lf %lf %lf %lf\n", u[i], v[i], uv_lambda[i] * 1E6, uv_dlambda[i] * 1E6);
+  // for (i = 0; i < nt3; ++i)
+  //   fprintf(pFile, "%lf %lf %lf %lf\n", (double)(t3in1[i]), (double)(t3in2[i]), (double)(t3in3[i]), 0.0);
+  // for (i = 0; i < nv2 + nt3amp + nvisamp + nt3phi + nvisphi; ++i)
+  //   fprintf(pFile, "%lf %lf %lf %lf\n", mod_obs[i], data[i], data_err[i], res[i]);
+  // fclose(pFile);
+  // // }
 
   free(res);
   free(mod_obs);
@@ -2285,13 +2637,14 @@ void register_image_mse(double *in_image, double *out_image, int nx, int ny, int
 // Compute final MCMC expectations for images and parameters
 //
 ////////////////////////////////
+// MODIFIED
 void mcmc_results(int minimization_engine, char *file_basename, const int nchains, const unsigned int *burn_in_times, const long depth, const long nelements,
-                  const unsigned short axis_len, const double complex *__restrict xtransform, const double complex *__restrict ytransform,
+                  const unsigned short axis_len, const double complex *__restrict xtransform, const double complex *__restrict ytransform, double complex *fftmatrix,
                   const unsigned short *saved_x, const unsigned short *saved_y, const double *saved_params, const long niter, const int nwavr,
                   double *final_params, double *final_params_std, double *reg_param, double *final_reg_value, const double *prior_image,
                   const unsigned short *initial_x, const unsigned short *initial_y, double *centroid_image_x, double *centroid_image_y, const double fov,
                   const double cent_mult, const int ndf, double tmin, double chi2_temp, double chi2_target, double mas_pixel, char *init_filename,
-                  char *prior_filename, double logZ, double logZe)
+                  char *prior_filename, double logZ, double logZe, double complex *pupilfunc, double phaseshift)
 // This averages the image obtained by MCMC over the iterations and chains
 // the depth input should be the actual available depth, not the requested one, unless the chain did not converge
 {
@@ -2376,7 +2729,8 @@ void mcmc_results(int minimization_engine, char *file_basename, const int nchain
   // Compute expectations over iterations
   //
   /////////////////////////////////////////
-  bool output_mean = 1, output_median = 1, output_mode = 1;
+  // MODIFIED: we want only mean
+  bool output_mean = 1, output_median = 0, output_mode = 0;
   double *images_mean, *images_mode, *images_median;
   char data_filename[MAX_STRINGS];
   // MEAN over iterations
@@ -2394,17 +2748,19 @@ void mcmc_results(int minimization_engine, char *file_basename, const int nchain
 
       if (nchains_eff < 2) {
         sprintf(data_filename, "%s", file_basename);
+        // MODIFIED
         mcmc_writeoutput(data_filename, &images_mean[t * nwavr * axis_len * axis_len], nchains, niter - burn_in_times[t], &burn_in_times[t], depth, nelements,
-                         axis_len, xtransform, ytransform, saved_x, saved_y, saved_params, niter, nwavr, final_params, final_params_std, reg_param,
+                         axis_len, xtransform, ytransform, fftmatrix, saved_x, saved_y, saved_params, niter, nwavr, final_params, final_params_std, reg_param,
                          final_reg_value, prior_image, initial_x, initial_y, centroid_image_x, centroid_image_y, fov, cent_mult, ndf, tmin, chi2_temp,
-                         chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe);
+                         chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe, pupilfunc, phaseshift);
       }
 
-      sprintf(data_filename, "%s_MEAN_chain%d", file_basename, t);
+      sprintf(data_filename, "%s_chain%d", file_basename, t);
+      // MODIFIED
       mcmc_writeoutput(data_filename, &images_mean[t * nwavr * axis_len * axis_len], nchains, niter - burn_in_times[t], &burn_in_times[t], depth, nelements,
-                       axis_len, xtransform, ytransform, saved_x, saved_y, saved_params, niter, nwavr, final_params, final_params_std, reg_param,
+                       axis_len, xtransform, ytransform, fftmatrix, saved_x, saved_y, saved_params, niter, nwavr, final_params, final_params_std, reg_param,
                        final_reg_value, prior_image, initial_x, initial_y, centroid_image_x, centroid_image_y, fov, cent_mult, ndf, tmin, chi2_temp,
-                       chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe);
+                       chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe, pupilfunc, phaseshift);
     }
   }
 
@@ -2420,10 +2776,11 @@ void mcmc_results(int minimization_engine, char *file_basename, const int nchain
         normalize_image(&images_median[t * nwavr * axis_len * axis_len + w * axis_len * axis_len], axis_len * axis_len);
 
       sprintf(data_filename, "%s_MEDIAN_chain%d", file_basename, t);
+      // MODIFIED 
       mcmc_writeoutput(data_filename, &images_median[t * nwavr * axis_len * axis_len], nchains, niter - burn_in_times[t], &burn_in_times[t], depth, nelements,
-                       axis_len, xtransform, ytransform, saved_x, saved_y, saved_params, niter, nwavr, final_params, final_params_std, reg_param,
+                       axis_len, xtransform, ytransform, fftmatrix, saved_x, saved_y, saved_params, niter, nwavr, final_params, final_params_std, reg_param,
                        final_reg_value, prior_image, initial_x, initial_y, centroid_image_x, centroid_image_y, fov, cent_mult, ndf, tmin, chi2_temp,
-                       chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe);
+                       chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe, pupilfunc, phaseshift);
     }
   }
 
@@ -2439,10 +2796,11 @@ void mcmc_results(int minimization_engine, char *file_basename, const int nchain
         normalize_image(&images_mode[t * nwavr * axis_len * axis_len + w * axis_len * axis_len], axis_len * axis_len);
 
       sprintf(data_filename, "%s_MODE_chain%d", file_basename, t);
+      // MODIFIED
       mcmc_writeoutput(data_filename, &images_mode[t * nwavr * axis_len * axis_len], nchains, niter - burn_in_times[t], &burn_in_times[t], depth, nelements,
-                       axis_len, xtransform, ytransform, saved_x, saved_y, saved_params, niter, nwavr, final_params, final_params_std, reg_param,
+                       axis_len, xtransform, ytransform, fftmatrix, saved_x, saved_y, saved_params, niter, nwavr, final_params, final_params_std, reg_param,
                        final_reg_value, prior_image, initial_x, initial_y, centroid_image_x, centroid_image_y, fov, cent_mult, ndf, tmin, chi2_temp,
-                       chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe);
+                       chi2_target, mas_pixel, init_filename, prior_filename, logZ, logZe, pupilfunc, phaseshift);
     }
   }
 
@@ -2611,48 +2969,83 @@ void compute_regularizers(const double *reg_param, double *reg_value, const doub
 
 }
 
-void compute_model_visibilities_fromelements(double complex *mod_vis, double complex *im_vis, double complex *param_vis, double *params,
+// void compute_model_visibilities_fromelements(double complex *mod_vis, double complex *im_vis, double complex *param_vis, double *params,
+//                                              double *fluxratio_image, const unsigned short *element_x, const unsigned short *element_y,
+//                                              const double complex *xtransform, const double complex *ytransform, double *lPriorModel, long nparams,
+//                                              long nelements) {
+//   long i, j;
+//   if (nparams > 0)
+//     // MODIFIED: maybe this is not used. but added axis_len for consistency
+//     model_vis(params, param_vis, lPriorModel, fluxratio_image, axis_len);
+//   else
+//     for (j = 0; j < nuv; ++j)
+//       param_vis[j] = 0.0;
+
+//   // Compute visibilities from scratch
+//   for (j = 0; j < nuv; ++j) {
+//     im_vis[j] = 0;
+//     for (i = 0; i < nelements; ++i)
+//       im_vis[j] += xtransform[element_x[uvwav2chan[j] * nelements + i] * nuv + j] * ytransform[element_y[uvwav2chan[j] * nelements + i] * nuv + j];
+//     im_vis[j] *= fluxratio_image[j] / (double)nelements; // Will add SED here
+//     mod_vis[j] = param_vis[j] + im_vis[j];
+//   }
+// }
+
+// MODIFIED: compute model visibilities from elemenets
+void compute_model_visibilities_fromelements_PL(double complex *mod_vis, double complex *im_vis, double complex *param_vis, double *params,
                                              double *fluxratio_image, const unsigned short *element_x, const unsigned short *element_y,
-                                             const double complex *xtransform, const double complex *ytransform, double *lPriorModel, long nparams,
-                                             long nelements) {
+                                             const double complex *fftmatrix, double *lPriorModel, long nparams,
+                                             long nelements, long axis_len) {
   long i, j;
-  if (nparams > 0)
-    model_vis(params, param_vis, lPriorModel, fluxratio_image);
+  if (nparams > 0){
+
+    // this computes param_vis (if model parameters are specified)
+    model_vis(params, param_vis, lPriorModel, fluxratio_image, axis_len);
+
+  }
   else
-    for (j = 0; j < nuv; ++j)
+    for (j = 0; j < axis_len*axis_len; ++j)
       param_vis[j] = 0.0;
 
   // Compute visibilities from scratch
-  for (j = 0; j < nuv; ++j) {
-    im_vis[j] = 0;
-    for (i = 0; i < nelements; ++i)
-      im_vis[j] += xtransform[element_x[uvwav2chan[j] * nelements + i] * nuv + j] * ytransform[element_y[uvwav2chan[j] * nelements + i] * nuv + j];
-    im_vis[j] *= fluxratio_image[j] / (double)nelements; // Will add SED here
+  // image elements to visibilities.
+
+  for (j=0; j < axis_len*axis_len; ++j){
+    // the elements are flux elements. 
+    for (i = 0; i < nelements; ++i){
+      // find the coordinate of the element
+      int where = element_y[i] * axis_len + element_x[i];
+      // add the contribution from the flux element to mutual intensity
+      im_vis[j] += fftmatrix[j*axis_len*axis_len + where] / (double)nelements;}
     mod_vis[j] = param_vis[j] + im_vis[j];
+
   }
+
 }
 
-void compute_model_visibilities_fromimage(double complex *mod_vis, double complex *im_vis, double complex *param_vis, const double *params,
-                                          double *fluxratio_image, const double *image, const double complex *xtransform, const double complex *ytransform,
+// MODIFIED: compute model visibilities from image
+void compute_model_visibilities_fromimage_PL(double complex *mod_vis, double complex *im_vis, double complex *param_vis, const double *params,
+                                          double *fluxratio_image, const double *image, const double complex *xtransform, const double complex *ytransform, const double complex *fftmatrix,
                                           double *lPriorModel, long nparams, long nelements, unsigned short axis_len) {
   // Note: input image should be normalized
 
-  long ix, iy, j;
-  if (nparams > 0)
-    model_vis(params, param_vis, lPriorModel, fluxratio_image);
+  long i, j;
+
+  if (nparams > 0){
+    
+    model_vis(params, param_vis, lPriorModel, fluxratio_image, axis_len);}
   else
-    for (j = 0; j < nuv; ++j)
+    for (j = 0; j < axis_len*axis_len; ++j)
       param_vis[j] = 0.0;
 
-  // Compute image visibilities
-  for (j = 0; j < nuv; ++j) {
-    im_vis[j] = 0;
-    for (ix = 0; ix < axis_len; ix++)
-      for (iy = 0; iy < axis_len; iy++)
-        im_vis[j] += image[uvwav2chan[j] * axis_len * axis_len + iy * axis_len + ix] * xtransform[ix * nuv + j] * ytransform[iy * nuv + j];
+  for (j = 0; j < axis_len*axis_len; ++j){
+    for (i = 0; i < axis_len*axis_len; ++i){
+      im_vis[j] += fftmatrix[j*axis_len*axis_len + i] * image[i];
+    }
+    mod_vis[j] = im_vis[j];
   }
 
-  for (j = 0; j < nuv; ++j) {
+  for (j = 0; j < axis_len*axis_len; ++j) {
     if (nparams > 0) {
 
       im_vis[j] *= fluxratio_image[j];
@@ -2661,6 +3054,38 @@ void compute_model_visibilities_fromimage(double complex *mod_vis, double comple
       mod_vis[j] = im_vis[j];
   }
 }
+
+
+// void compute_model_visibilities_fromimage(double complex *mod_vis, double complex *im_vis, double complex *param_vis, const double *params,
+//                                           double *fluxratio_image, const double *image, const double complex *xtransform, const double complex *ytransform,
+//                                           double *lPriorModel, long nparams, long nelements, unsigned short axis_len) {
+//   // Note: input image should be normalized
+
+//   long ix, iy, j;
+//   if (nparams > 0)
+//   // MODIFIED: maybe this is not used. but added axis_len for consistency
+//     model_vis(params, param_vis, lPriorModel, fluxratio_image, axis_len);
+//   else
+//     for (j = 0; j < nuv; ++j)
+//       param_vis[j] = 0.0;
+
+//   // Compute image visibilities
+//   for (j = 0; j < nuv; ++j) {
+//     im_vis[j] = 0;
+//     for (ix = 0; ix < axis_len; ix++)
+//       for (iy = 0; iy < axis_len; iy++)
+//         im_vis[j] += image[uvwav2chan[j] * axis_len * axis_len + iy * axis_len + ix] * xtransform[ix * nuv + j] * ytransform[iy * nuv + j];
+//   }
+
+//   for (j = 0; j < nuv; ++j) {
+//     if (nparams > 0) {
+
+//       im_vis[j] *= fluxratio_image[j];
+//       mod_vis[j] = param_vis[j] + im_vis[j];
+//     } else
+//       mod_vis[j] = im_vis[j];
+//   }
+// }
 
 void initialize_image(int iChain, double *image, unsigned short *element_x, unsigned short *element_y, unsigned short *initial_x, unsigned short *initial_y,
                       unsigned short axis_len, int nwavr, long nelements, char *init_filename) {
@@ -2677,13 +3102,14 @@ void initialize_image(int iChain, double *image, unsigned short *element_x, unsi
       image[w * axis_len * axis_len + element_y[w * nelements + i] * axis_len + element_x[w * nelements + i]]++;
 }
 
+// MODIFIED: read pupil function matrix file and phase shift
 bool read_commandline(int *argc, char **argv, bool *benchmark, bool *use_v2, bool *use_t3amp, bool *use_t3phi, bool *use_visamp, bool *use_visphi,
                       bool *diffvis, bool *use_tempfitswriting, bool *use_bandwidthsmearing, int *minimization_engine, bool *dumpchain, double *mas_pixel,
                       unsigned short *axis_len, long *depth, long *niter, long *nelements, double *f_anywhere, double *f_copycat, int *nchains, int *nthreads,
                       double *tempschedc, double *fov, double *chi2_temp, double *chi2_target, double *tmin, double *prob_auto, double *uvtol,
-                      char *output_filename, char *init_filename, char *prior_filename, double *v2s, double *v2a, double *t3amps, double *t3ampa,
+                      char *output_filename, char *init_filename, char *prior_filename, char *matrix_filename, double *v2s, double *v2a, double *t3amps, double *t3ampa,
                       double *t3phia, double *t3phis, double *visamps, double *visampa, double *visphis, double *visphia, double *fluxs, double *cvfwhm,
-                      double *reg_param, double *init_param, double **pwavmin, double **pwavmax, int *nwavr, bool *wavauto, bool *verbose_import) {
+                      double *reg_param, double *init_param, double **pwavmin, double **pwavmax, int *nwavr, bool *wavauto, bool *verbose_import, double *phaseshift) {
   long i, j, k;
   double *wavmin, *wavmax;
   /* Read in command line info... */
@@ -2829,6 +3255,12 @@ bool read_commandline(int *argc, char **argv, bool *benchmark, bool *use_v2, boo
         sscanf(argv[i + 1], "%s", init_filename);
       else if (strcmp(argv[i], "-p") == 0)
         sscanf(argv[i + 1], "%s", prior_filename);
+      // MODIFIED : read pupil functions
+      else if (strcmp(argv[i], "-aperture") == 0)
+        sscanf(argv[i + 1], "%s", matrix_filename);
+      // MODIFIED : read phaseshift
+      else if (strcmp(argv[i], "-phaseshift") ==0)
+        sscanf(argv[i + 1], "%lf", phaseshift);
       else if (strcmp(argv[i], "-v2s") == 0) {
         sscanf(argv[i + 1], "%lf", v2s);
       } else if (strcmp(argv[i], "-v2a") == 0) {
@@ -2971,39 +3403,44 @@ void print_diagnostics(int iChain, long current_iter, long nvis, long nv2, long 
   char diagnostics[maxlength];
   int diagnostics_used = 0;
 
+  // MODIFIED
+  diagnostics_used = snprintf(diagnostics, maxlength, "Chain: %d lPost:%8.1f lPrior:%8.1f lLike:%9.1f ", iChain, lPosterior, lPrior, lLikelihood);
   /* Print output to screen (or wherever stdout is piped to) */
 
-  // compute reduced chi2
-  if (nv2 > 0)
-    chi2v2 /= (double)nv2;
-  if (nt3amp > 0)
-    chi2t3amp /= (double)nt3amp;
-  if (nt3phi > 0)
-    chi2t3phi /= (double)nt3phi;
-  if (nvisphi > 0)
-    chi2visphi /= (double)nvisphi;
-  if (nvisamp > 0)
-    chi2visamp /= (double)nvisamp;
+  // // compute reduced chi2
+  // if (nv2 > 0)
+  //   chi2v2 /= (double)nv2;
+  // if (nt3amp > 0)
+  //   chi2t3amp /= (double)nt3amp;
+  // if (nt3phi > 0)
+  //   chi2t3phi /= (double)nt3phi;
+  // if (nvisphi > 0)
+  //   chi2visphi /= (double)nvisphi;
+  // if (nvisamp > 0)
+  //   chi2visamp /= (double)nvisamp;
 
   for (w = 0; w < nwavr; ++w) // diagnostics
   {
+    // MODIFIED
+    diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_RED "V2:%5.2f " TEXT_COLOR_BLACK, chi2v2);
+    diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_GREEN "T3P:%5.2f " TEXT_COLOR_BLACK, chi2t3phi);
 
-    if (nwavr > 1)
-      diagnostics_used =
-          snprintf(diagnostics, maxlength, "Chain: %d Chan: %ld lPost:%8.1f lPrior:%8.1f lLike:%9.1f ", iChain, w, lPosterior, lPrior, lLikelihood);
-    else
-      diagnostics_used = snprintf(diagnostics, maxlength, "Chain: %d lPost:%8.1f lPrior:%8.1f lLike:%9.1f ", iChain, lPosterior, lPrior, lLikelihood);
+    // if (nwavr > 1)
+    //   diagnostics_used =
+    //       snprintf(diagnostics, maxlength, "Chain: %d Chan: %ld lPost:%8.1f lPrior:%8.1f lLike:%9.1f ", iChain, w, lPosterior, lPrior, lLikelihood);
+    // else
+    //   diagnostics_used = snprintf(diagnostics, maxlength, "Chain: %d lPost:%8.1f lPrior:%8.1f lLike:%9.1f ", iChain, lPosterior, lPrior, lLikelihood);
 
-    if (nv2 > 0)
-      diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_RED "V2:%5.2f " TEXT_COLOR_BLACK, chi2v2);
-    if (nt3amp > 0)
-      diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_BLUE "T3A:%5.2f " TEXT_COLOR_BLACK, chi2t3amp);
-    if (nt3phi > 0)
-      diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_GREEN "T3P:%5.2f " TEXT_COLOR_BLACK, chi2t3phi);
-    if (nvisamp > 0)
-      diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_CYAN "VA:%5.2f " TEXT_COLOR_BLACK, chi2visamp);
-    if (nvisphi > 0)
-      diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_MAGENTA "VP:%5.2f " TEXT_COLOR_BLACK, chi2visphi);
+    // if (nv2 > 0)
+    //   diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_RED "V2:%5.2f " TEXT_COLOR_BLACK, chi2v2);
+    // if (nt3amp > 0)
+    //   diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_BLUE "T3A:%5.2f " TEXT_COLOR_BLACK, chi2t3amp);
+    // if (nt3phi > 0)
+    //   diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_GREEN "T3P:%5.2f " TEXT_COLOR_BLACK, chi2t3phi);
+    // if (nvisamp > 0)
+    //   diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_CYAN "VA:%5.2f " TEXT_COLOR_BLACK, chi2visamp);
+    // if (nvisphi > 0)
+    //   diagnostics_used += snprintf(diagnostics + diagnostics_used, maxlength - diagnostics_used, TEXT_COLOR_MAGENTA "VP:%5.2f " TEXT_COLOR_BLACK, chi2visphi);
 
     // Print values of monospectral regularizers
     for (int k = 1; k < NREGULS - 2; k++) {

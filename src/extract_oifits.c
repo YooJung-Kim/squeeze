@@ -51,6 +51,223 @@ void find_vec_minmax(double* output_min, double *output_max, double* vec, long N
 
 void add_new_uv(long *obs_index, long *uvindex, double new_u, double new_v, double new_uv_lambda, double new_uv_dlambda, double new_uv_time, double *table_u, double *table_v, double *table_uv_lambda, double *table_uv_dlambda, double *table_uv_time, double uvtol);
 
+
+int import_PLfits(char *filename, double v2a, double v2s, double t3phia, double t3phis, double visampa, double visamps){
+
+        STATUS status = 0;
+        fitsfile *infile;
+        int hdutype, colnum;
+
+        if (fits_open_file(&infile, filename, READONLY, &status))
+                printerror(status);
+        printf("FITS file %s opened\n", filename);
+
+
+        // Read intensities
+
+        if (fits_movabs_hdu(infile, 2, &hdutype, &status))
+                printerror(status);
+        printf("Reading intensities\n");
+
+        int anynull;
+        long irow=1;
+        int *mode;
+        double intens0; // = NULL;
+        double intenerr0;
+
+        double *intens = malloc(6 * sizeof(double));
+        double *intenerrs = malloc(6 * sizeof(double));
+        
+        for (irow = 1; irow <= 6; irow++){
+                fits_get_colnum(infile, CASEINSEN, "modes", &colnum, &status);
+                fits_read_col(infile, TINT, colnum, irow, 1, 1, NULL,
+                  &mode, &anynull, &status);
+
+                fits_get_colnum(infile, CASEINSEN, "inten", &colnum, &status);
+                fits_read_col(infile, TDOUBLE, colnum, irow, 1, 1, NULL,
+                  &intens0, &anynull, &status);
+                intens[irow-1] = intens0;   
+
+                fits_get_colnum(infile, CASEINSEN, "intenerr", &colnum, &status);
+                fits_read_col(infile, TDOUBLE, colnum, irow, 1, 1, NULL,
+                  &intenerr0, &anynull, &status);
+                intenerrs[irow-1] = intenerr0;
+        }
+
+        for (irow = 0; irow < 6; irow++){
+                printf("Mode = %d, inten = %.10f, intenerr = %.10f\n", irow+1, intens[irow], intenerrs[irow]);
+        }
+
+        // Read squared visibilities
+
+        if (fits_movabs_hdu(infile, 3, &hdutype, &status))
+                printerror(status);
+        printf("Reading squared visibilities\n");
+
+        int modea0, modeb0;
+        double sqvis0; // = NULL;
+        double sqviserr0;
+
+        int *modea = malloc(15 * sizeof(int));
+        int *modeb = malloc(15 * sizeof(int));
+        double *sqviss = malloc(15 * sizeof(double));
+        double *sqviserrs = malloc(15 * sizeof(double));
+
+        for (irow = 1; irow <= 15; irow++){
+                fits_get_colnum(infile, CASEINSEN, "modes1", &colnum, &status);
+                fits_read_col(infile, TINT, colnum, irow, 1, 1, NULL,
+                  &modea0, &anynull, &status);
+                modea[irow-1] = modea0;
+
+                fits_get_colnum(infile, CASEINSEN, "modes2", &colnum, &status);
+                fits_read_col(infile, TINT, colnum, irow, 1, 1, NULL,
+                  &modeb0, &anynull, &status);
+                modeb[irow-1] = modeb0;
+
+                fits_get_colnum(infile, CASEINSEN, "sqvis", &colnum, &status);
+                fits_read_col(infile, TDOUBLE, colnum, irow, 1, 1, NULL,
+                  &sqvis0, &anynull, &status);
+                sqviss[irow-1] = sqvis0;   
+
+                fits_get_colnum(infile, CASEINSEN, "sqviserr", &colnum, &status);
+                fits_read_col(infile, TDOUBLE, colnum, irow, 1, 1, NULL,
+                  &sqviserr0, &anynull, &status);
+                sqviserrs[irow-1] = sqviserr0;
+        }
+
+        for (irow = 0; irow < 15; irow++){
+                printf("Mode = %d %d, sqvis = %.10f, sqviserr = %.10f\n", modea[irow], modeb[irow], sqviss[irow], sqviserrs[irow]);
+        }
+
+        // Read closure phases
+
+        if (fits_movabs_hdu(infile, 4, &hdutype, &status))
+                printerror(status);
+        printf("Reading closure phases\n");
+
+        int modec0;
+        double cphase0; // = NULL;
+        double cphaseerr0;
+
+        int *cmodea = malloc(20 * sizeof(int));
+        int *cmodeb = malloc(20 * sizeof(int));
+        int *cmodec = malloc(20 * sizeof(int));
+        double *cphases = malloc(20 * sizeof(double));
+        double *cphaseerrs = malloc(20 * sizeof(double));
+
+        for (irow = 1; irow <= 20; irow++){
+                fits_get_colnum(infile, CASEINSEN, "modes1", &colnum, &status);
+                fits_read_col(infile, TINT, colnum, irow, 1, 1, NULL,
+                  &modec0, &anynull, &status);
+                cmodea[irow-1] = modec0;
+
+                fits_get_colnum(infile, CASEINSEN, "modes2", &colnum, &status);
+                fits_read_col(infile, TINT, colnum, irow, 1, 1, NULL,
+                  &modec0, &anynull, &status);
+                cmodeb[irow-1] = modec0;
+
+                fits_get_colnum(infile, CASEINSEN, "modes3", &colnum, &status);
+                fits_read_col(infile, TINT, colnum, irow, 1, 1, NULL,
+                  &modec0, &anynull, &status);
+                cmodec[irow-1] = modec0;
+
+                fits_get_colnum(infile, CASEINSEN, "cphase", &colnum, &status);
+                fits_read_col(infile, TDOUBLE, colnum, irow, 1, 1, NULL,
+                  &cphase0, &anynull, &status);
+                cphases[irow-1] = cphase0;   
+
+                fits_get_colnum(infile, CASEINSEN, "cphaseerr", &colnum, &status);
+                fits_read_col(infile, TDOUBLE, colnum, irow, 1, 1, NULL,
+                  &cphaseerr0, &anynull, &status);
+                cphaseerrs[irow-1] = cphaseerr0;
+        }
+
+        for (irow = 0; irow < 20; irow++){
+                printf("Mode = %d %d %d, cphase = %.10f, cphaseerr = %.10f\n", cmodea[irow], cmodeb[irow], cmodec[irow], cphases[irow], cphaseerrs[irow]);
+        }    
+        
+        fits_close_file(infile, &status);    
+
+        // Fill the data vector
+        // The idea behind this is to make the data easier to filter/use
+        // Order is V2, T3AMP, T3PHI, VISPHI
+        // We are also getting rid of all the bad data detected in previous steps
+        // and correcting for zeroflux for amplitudes
+        // and converting angles to radians
+        
+        data = malloc((6+15+20) * sizeof(double));
+        data_err = malloc((6+15+20) * sizeof(double));
+        
+        for (int i = 0; i < 6; i++)
+        {
+                data[i] = intens[i]; // / (fluxs * fluxs);
+                data_err[i] = intenerrs[i] ;//* (fluxs * fluxs);
+        }
+
+        for (int i = 0; i < 15; i++)
+        {
+                data[6 + i] = sqviss[i]; // / (fluxs * fluxs * fluxs);
+                data_err[6 + i] = sqviserrs[i];// * (fluxs * fluxs * fluxs);
+        }
+
+        for (int i = 0; i < 20; i++)
+        {
+                data[6 + 15 + i] = cphases[i]; // / (fluxs * fluxs * fluxs);
+                data_err[6 + 15 + i] = cphaseerrs[i];// * (fluxs * fluxs * fluxs);
+        }
+
+        printf("Data stored!!! \n\n");
+
+        if ((v2s != 1.0) || (v2a != 0.0)) printf("OIFITS import -- V2 rescaling: mult=%lf add= %lf\n", v2s, v2a);
+        if ((visamps != 1.0) || (visampa != 0.0)) printf("OIFITS import -- Intensity rescaling: mult=%lf add= %lf\n", visamps, visampa);
+        if ((t3phis != 1.0) || (t3phia != 0.0)) printf("OIFITS import -- T3PHI rescaling: mult=%lf add= %lf\n", t3phis, t3phia);
+
+        double temp;
+
+        for (int i = 1; i < 6; i++)
+        {
+                if (data_err[i] > 0)
+                        temp = (data_err[i] * visamps + visampa);
+                else
+                        temp = 0;
+
+                if (temp > 0)
+                        data_err[i] = temp;
+                else
+                        data_err[i] = 0.;
+        }
+
+        for (int i = 6; i < 6+15; i++)
+        {
+                if (data_err[i] > 0)
+                        temp = (data_err[i] * v2s + v2a);
+                else
+                        temp = 0;
+
+                if (temp > 0)
+                        data_err[i] = temp;
+                else
+                        data_err[i] = 0.;
+        }
+
+
+        for (int i = 6+15; i < 6+15+20; i++)
+        {
+                if (data_err[i] > 0)
+                        temp = (data_err[i] * t3phis + t3phia);
+                else
+                        temp = 0;
+
+                if (temp > 0)
+                        data_err[nv2 + nt3amp + nvisamp + i]  = temp;
+                else
+                        data_err[nv2 + nt3amp + nvisamp + i]  = 0.;
+        }
+
+        return 0;
+
+}
+
 int import_single_epoch_oifits(char *filename, bool use_v2, bool use_t3amp, bool use_t3phi, bool use_visamp, bool use_visphi,
                                double v2a, double v2s, double t3ampa, double t3amps, double t3phia, double t3phis,
                                double visampa, double visamps, double visphia, double visphis, double fluxs, double cwhm, double uvtol, int* pnwavr,

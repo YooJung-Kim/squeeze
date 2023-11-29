@@ -140,18 +140,28 @@ void printerror(int status);
 void intHandler(int signum);
 void printhelp(void);
 
-bool read_commandline(int *argc, char **argv, bool *benchmark, bool *use_v2, bool *use_t3amp, bool *use_t3phi, bool *use_visamp, bool *use_visphi, bool *use_diffvis, bool *use_tempfitswriting, bool *use_bandwidthsmearing, int *minimization_engine, bool *dumpchain, double *mas_pixel, unsigned short *axis_len, long *depth, long *niter, long *nelements, double *f_anywhere, double *f_copycat, int *nchains, int *nthreads, double *tempschedc, double *fov, double *chi2_temp, double *chi2_target, double *tmin, double *prob_auto, double *uvtol, char *output_filename, char *init_filename, char *prior_filename, double *v2s, double *v2a, double *t3amps, double *t3ampa, double *t3phia, double *t3phis, double *visamps, double *visampa, double *visphis, double *visphia, double *fluxs, double *cvfwhm, double *reg_param, double *init_param, double **wavmin, double **wavmax, int *nwavr, bool* wavauto, bool* verbose_import);
+// MODIFIED: read pupil function matrix file and phase shift
+bool read_commandline(int *argc, char **argv, bool *benchmark, bool *use_v2, bool *use_t3amp, bool *use_t3phi, bool *use_visamp, bool *use_visphi, bool *use_diffvis, bool *use_tempfitswriting, bool *use_bandwidthsmearing, int *minimization_engine, bool *dumpchain, double *mas_pixel, unsigned short *axis_len, long *depth, long *niter, long *nelements, double *f_anywhere, double *f_copycat, int *nchains, int *nthreads, double *tempschedc, double *fov, double *chi2_temp, double *chi2_target, double *tmin, double *prob_auto, double *uvtol, char *output_filename, char *init_filename, char *prior_filename, char *matrix_filename, double *v2s, double *v2a, double *t3amps, double *t3ampa, double *t3phia, double *t3phis, double *visamps, double *visampa, double *visphis, double *visphia, double *fluxs, double *cvfwhm, double *reg_param, double *init_param, double **wavmin, double **wavmax, int *nwavr, bool* wavauto, bool* verbose_import, double *phaseshift);
 
 void print_diagnostics(int iChain, long current_iter, long nvis, long nv2, long nt3, long nt3phi, long nt3amp, long nvisamp, long nvisphi, double chi2v2, double chi2t3amp, double chi2t3phi, double chi2visphi, double chi2visamp, double lPosterior, double lPrior, double lLikelihood, const double *reg_param, const double *reg_value, const double *centroid_image_x, const double *centroid_image_y, long nelements, int nwavr, long niter, const double *temperature, double prob_movement, const double *params, const double *stepsize, unsigned int* burn_in_times);
 
-void compute_lLikelihood(double *likelihood, const double complex *__restrict mod_vis, double *__restrict res, double *__restrict mod_obs, double *chi2v2, double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi, const int nwavr);
+// MODIFIED
+void compute_lLikelihood_PL(double *likelihood, const double complex *__restrict mod_vis, double *__restrict res, double *__restrict mod_obs, double *chi2v2, double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi, const int nwavr, double complex *pupilfunc, int axis_len, double phaseshift);
+// void compute_lLikelihood(double *likelihood, const double complex *__restrict mod_vis, double *__restrict res, double *__restrict mod_obs, double *chi2v2, double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi, const int nwavr);
 void compute_lPrior(double *lPrior, const long chan, const double *reg_param, const double *reg_value);
 
-void vis_to_obs(const double complex *mod_vis, double *mod_obs, const int nwavr);
-void obs_to_res(const double *mod_obs, double *res);
-double residuals_to_chi2(const double *res, double *chi2v2, double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi) ;
+// MODIFIED
+void vis_to_obs_PL(const double complex *mod_vis, double *mod_obs, const int nwavr, double complex *pupilfunc, int axis_len, double phaseshift);
+// void vis_to_obs(const double complex *mod_vis, double *mod_obs, const int nwavr);
+void obs_to_res_PL(const double *mod_obs, double *res);
+// void obs_to_res(const double *mod_obs, double *res);
 
-double get_flat_chi2(bool benchmark, const int nwavr);
+// MODIFIED
+double residuals_to_chi2_PL(const double *res, double *chi2v2, double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi) ;
+// double residuals_to_chi2(const double *res, double *chi2v2, double *chi2t3amp, double *chi2visamp, double *chi2t3phi, double *chi2visphi) ;
+
+// MODIFIED: need pupil functions and other stuff to calculate flat chi2
+double get_flat_chi2(bool benchmark, const int nwavr, double complex *pupilfunc, long axis_len, double phaseshift);
 double fill_min_elts(long *min_elts, long depth, long threadnum);
 static inline double dewrap(double diff) __attribute__((always_inline));
 static inline double modsq(double complex input)  __attribute__((always_inline));
@@ -163,13 +173,22 @@ int writeasfits(const char *file_basename, double *image, int nwavr, long depth,
                 unsigned short axis_len, double ndf, double tmin, double chi2_temp, double chi2_target, double mas_pixel, int nchains, double logZ, double logZ_err,
                 char *init_filename, char *prior_filename, double *params, double *params_std);
 
+//MODIFIED
 void mcmc_results(int minimization_engine, char *file_basename, const int nchains, const unsigned int *burn_in_times, const long depth, const long nelements, const unsigned short axis_len,
-                            const double complex *__restrict xtransform, const double complex *__restrict ytransform,
+                            const double complex *__restrict xtransform, const double complex *__restrict ytransform, double complex *mymatrix,
                             const unsigned short *saved_x, const unsigned short *saved_y, const double *saved_params, const long niter,
                             const int nwavr, double *final_params, double *final_params_std,
                             double *reg_param, double *final_reg_value, const double *prior_image, const unsigned short *initial_x, const unsigned short *initial_y,
 		            double *centroid_image_x, double *centroid_image_y, const double fov, const double cent_mult, const int ndf, double tmin, double chi2_temp,
-		            double chi2_target, double mas_pixel, char *init_filename, char *prior_filename, double logZ, double logZe);
+		            double chi2_target, double mas_pixel, char *init_filename, char *prior_filename, double logZ, double logZe, double complex *pupilfunc, double phaseshift);
+
+// void mcmc_results(int minimization_engine, char *file_basename, const int nchains, const unsigned int *burn_in_times, const long depth, const long nelements, const unsigned short axis_len,
+//                             const double complex *__restrict xtransform, const double complex *__restrict ytransform,
+//                             const unsigned short *saved_x, const unsigned short *saved_y, const double *saved_params, const long niter,
+//                             const int nwavr, double *final_params, double *final_params_std,
+//                             double *reg_param, double *final_reg_value, const double *prior_image, const unsigned short *initial_x, const unsigned short *initial_y,
+// 		            double *centroid_image_x, double *centroid_image_y, const double fov, const double cent_mult, const int ndf, double tmin, double chi2_temp,
+// 		            double chi2_target, double mas_pixel, char *init_filename, char *prior_filename, double logZ, double logZe);
 
 
 void compute_logZ(const double *temperature , const unsigned short *iStoragetoThread, const double *lLikelihood_expectation, const double *lLikelihood_deviation, int nchains, double *logZ, double *logZ_err);
@@ -182,14 +201,24 @@ void compute_regularizers(const double *reg_param, double *reg_value, const doub
                           const long nelements, double *centroid_image_x, double *centroid_image_y, const double fov,
                           const double cent_mult);
 
-void compute_model_visibilities_fromelements(double complex *mod_vis, double complex *im_vis, double complex *param_vis, double *params, double *fluxratio_image, const unsigned short *element_x, const unsigned short *element_y, const double complex *xtransform, const double complex *ytransform, double *lPriorModel, long nparams, long nelements);
+// void compute_model_visibilities_fromelements(double complex *mod_vis, double complex *im_vis, double complex *param_vis, double *params, double *fluxratio_image, const unsigned short *element_x, const unsigned short *element_y, const double complex *xtransform, const double complex *ytransform, double *lPriorModel, long nparams, long nelements);
+// MODIFIED
+void compute_model_visibilities_fromelements_PL(double complex *mod_vis, double complex *im_vis, double complex *param_vis, double *params,
+                                             double *fluxratio_image, const unsigned short *element_x, const unsigned short *element_y,
+                                             const double complex *fftmatrix, double *lPriorModel, long nparams,
+                                             long nelements, long axis_len);
 
-void compute_model_visibilities_fromimage(double complex *mod_vis, double complex *im_vis, double complex *param_vis, const double *params, double *fluxratio_image, const double *image, const double complex *xtransform, const double complex *ytransform, double *lPriorModel, long nparams, long nelements, unsigned short axis_len);
+// void compute_model_visibilities_fromimage(double complex *mod_vis, double complex *im_vis, double complex *param_vis, const double *params, double *fluxratio_image, const double *image, const double complex *xtransform, const double complex *ytransform, double *lPriorModel, long nparams, long nelements, unsigned short axis_len);
+// MODIFIED
+void compute_model_visibilities_fromimage_PL(double complex *mod_vis, double complex *im_vis, double complex *param_vis, const double *params, double *fluxratio_image, const double *image, const double complex *xtransform, const double complex *ytransform,  const double complex *fftmatrix, double *lPriorModel, long nparams, long nelements, unsigned short axis_len);
 
 void initialize_image(int iChain, double *image, unsigned short *element_x, unsigned short *element_y, unsigned short *initial_x, unsigned short *initial_y,
                       unsigned short axis_len, int nwavr,  long nelements, char *init_filename);
 
 /* Function prototype for extract_oifits.c*/
+// MODIFIED: read PL interferometry data
+int import_PLfits(char *filename, double v2a, double v2s, double t3phia, double t3phis, double visampa, double visamps);
+
 int import_single_epoch_oifits(char *filename, bool use_v2, bool use_t3amp, bool use_t3phi, bool use_visamp, bool use_visphi,
                                double v2a, double v2s, double t3ampa, double t3amps, double t3phia, double t3phis,
                                double visampa, double visamps, double visphia, double visphis, double fluxs, double cwhm, double uvtol, int* pnwavr,
@@ -197,7 +226,7 @@ int import_single_epoch_oifits(char *filename, bool use_v2, bool use_t3amp, bool
 int write_best_oifits(char *filestring, double complex *mod_vis);
 
 /* Function prototype for modelcode.c */
-int model_vis(const double *params, double complex *modvis, double *logl, double *flux_frac);
+int model_vis(const double *params, double complex *modvis, double *logl, double *flux_frac, long axis_len);
 
 /* regularizations.c */
 double entropy(const double s);

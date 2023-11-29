@@ -26,7 +26,8 @@ with parameters :
 const char *model_param_names[6] = {"flux_star   ", "UD        ", "env_indx  ", "lambda_0 ", "flux_bg  ", "bg_indx "};
 
 extern double j1(double);
-int model_vis(const double *params, double complex *modvis, double *lPriorModel, double *flux_frac) {
+// MODIFIED: model_vis now needs axis_len
+int model_vis(const double *params, double complex *modvis, double *lPriorModel, double *flux_frac, long axis_len) {
   int status = 0;
   long i;
   double lPriorParams[6];
@@ -39,7 +40,26 @@ int model_vis(const double *params, double complex *modvis, double *lPriorModel,
   double tempd, f_primary, f_env, f_bg;
   double complex vis_primary;
 
-  for(i = 0; i < nuv; i++)
+  // for(i = 0; i < nuv; i++)
+  //       {
+  //           // Compute visibilities for unity fluxes
+  //           if (ud_primary > 0)
+  //           {
+  //             tempd = M_PI * ud_primary / MAS_RAD * sqrt(u[i] * u[i] + v[i] * v[i]) + 1e-15;
+  //             vis_primary = 2.0 * j1(tempd) / tempd + 0*I;
+  //           }
+  //           else
+  //                vis_primary = 1.0 + 0*I;
+  //           // Compute fluxes
+  //           f_primary = f_primary_ref * pow(uv_lambda[i] / lambda_ref, -4.0); // Stellar flux primary
+  //           f_bg = f_bg_ref * pow(uv_lambda[i] / lambda_ref, bg_ind);
+  //           f_env = (1.0 - f_primary_ref - f_bg) * pow(uv_lambda[i] / lambda_ref, env_ind); // environment flux
+  //           flux_frac[i] = f_env / (f_primary + f_env + f_bg ); // Flux ratio Disc/Total flux = Flux ratio Image/(Image + Model)
+  //           // Visibilities for the model
+  //           modvis[i] = f_primary * vis_primary / (f_primary + f_env + f_bg );
+  //       }
+  
+  for(i = 0; i < axis_len*axis_len; i++)
         {
             // Compute visibilities for unity fluxes
             if (ud_primary > 0)
@@ -49,10 +69,11 @@ int model_vis(const double *params, double complex *modvis, double *lPriorModel,
             }
             else
                  vis_primary = 1.0 + 0*I;
+                 //printf("It's just 1\n");
             // Compute fluxes
-            f_primary = f_primary_ref * pow(uv_lambda[i] / lambda_ref, -4.0); // Stellar flux primary
-            f_bg = f_bg_ref * pow(uv_lambda[i] / lambda_ref, bg_ind);
-            f_env = (1.0 - f_primary_ref - f_bg) * pow(uv_lambda[i] / lambda_ref, env_ind); // environment flux
+            f_primary = f_primary_ref ; //* pow(uv_lambda[i] / lambda_ref, -4.0); // Stellar flux primary
+            f_bg = 0.0; //f_bg_ref * pow(uv_lambda[i] / lambda_ref, bg_ind);
+            f_env = (1 - f_primary_ref - f_bg) ; //(1.0 - f_primary_ref - f_bg) * pow(uv_lambda[i] / lambda_ref, env_ind); // environment flux
             flux_frac[i] = f_env / (f_primary + f_env + f_bg ); // Flux ratio Disc/Total flux = Flux ratio Image/(Image + Model)
             // Visibilities for the model
             modvis[i] = f_primary * vis_primary / (f_primary + f_env + f_bg );
