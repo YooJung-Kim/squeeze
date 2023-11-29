@@ -1,0 +1,19 @@
+# Hashes of file build rules.
+cd24a934dce1f96bd5839553fc518302 CMakeFiles/libcfitsio
+01fdf76765490d2abf42f35340960a3b CMakeFiles/libcfitsio-complete
+cd24a934dce1f96bd5839553fc518302 CMakeFiles/librngstreams
+b02f0d92bf593fef8f6ee6849a7a0918 CMakeFiles/librngstreams-complete
+0e87bad792df3e8c9f1a2c7c73c9a6c2 libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-build
+95420f34464d46a6fc6c66efeadc4ea3 libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-configure
+7ff3de86c6a7e6ad284a0c42b4548f35 libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-download
+3fb46df50120bd9314a3e29dd07e7381 libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-install
+68482439c0a7dbc3fdc48def449c635b libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-mkdir
+aab72e327e26b4f80abbba32ae1c1693 libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-patch
+f1e17ed06e72495322ff94806f852da2 libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-update
+e0f174869d0d2acd730ea69aa894b709 librngstreams-prefix/src/librngstreams-stamp/librngstreams-build
+edf16937cc5e2e1f43cf263f172e1747 librngstreams-prefix/src/librngstreams-stamp/librngstreams-configure
+669122796108176932a9b65ff37d05f0 librngstreams-prefix/src/librngstreams-stamp/librngstreams-download
+99dfb59721c3189888b388b0af0d76f5 librngstreams-prefix/src/librngstreams-stamp/librngstreams-install
+460f94921757ae824ca6eb75c7f2cb37 librngstreams-prefix/src/librngstreams-stamp/librngstreams-mkdir
+5ad6c84fffbffb43d7fba7053751e848 librngstreams-prefix/src/librngstreams-stamp/librngstreams-patch
+1876d8007ee94d49f43b8ea9966b3018 librngstreams-prefix/src/librngstreams-stamp/librngstreams-update

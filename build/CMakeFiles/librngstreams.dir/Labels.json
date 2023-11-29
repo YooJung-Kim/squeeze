@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/CMakeFiles/librngstreams"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/CMakeFiles/librngstreams.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/CMakeFiles/librngstreams-complete.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/librngstreams-prefix/src/librngstreams-stamp/librngstreams-build.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/librngstreams-prefix/src/librngstreams-stamp/librngstreams-configure.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/librngstreams-prefix/src/librngstreams-stamp/librngstreams-download.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/librngstreams-prefix/src/librngstreams-stamp/librngstreams-install.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/librngstreams-prefix/src/librngstreams-stamp/librngstreams-mkdir.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/librngstreams-prefix/src/librngstreams-stamp/librngstreams-patch.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/librngstreams-prefix/src/librngstreams-stamp/librngstreams-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"librngstreams"
+		],
+		"name" : "librngstreams"
+	}
+}

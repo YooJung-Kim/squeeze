@@ -1,0 +1,1 @@
+cmd='/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/lib/rngstreams/configure;--silent'

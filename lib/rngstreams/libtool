@@ -44,7 +44,7 @@ available_tags=" CXX F77"
 
 # ### BEGIN LIBTOOL CONFIG
 
-# Libtool was configured on host voyager:
+# Libtool was configured on host login1:
 
 # Shell to use when invoking shell scripts.
 SHELL="/bin/sh"
@@ -82,13 +82,13 @@ AR="ar"
 AR_FLAGS="cru"
 
 # A C compiler.
-LTCC="gcc"
+LTCC="/bin/gcc"
 
 # LTCC compiler flags.
 LTCFLAGS="-g -O2"
 
 # A language-specific compiler.
-CC="gcc"
+CC="/bin/gcc"
 
 # Is the compiler the GNU C compiler?
 with_gcc=yes
@@ -171,7 +171,7 @@ dlopen_self=unknown
 dlopen_self_static=unknown
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag="-static"
+link_static_flag=""
 
 # Compiler flag to turn off builtin functions.
 no_builtin_flag=" -fno-builtin"
@@ -329,10 +329,10 @@ variables_saved_for_relink="PATH LD_LIBRARY_PATH LD_RUN_PATH GCC_EXEC_PREFIX COM
 link_all_deplibs=unknown
 
 # Compile-time system search path for libraries
-sys_lib_search_path_spec="/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0 /usr/lib /lib"
+sys_lib_search_path_spec="/usr/lib/gcc/x86_64-redhat-linux/4.8.5 /usr/lib64 /lib64 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/compiler/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/tbb/lib/intel64_lin/gcc4.8 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/daal/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/tbb/lib/intel64/gcc4.8 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/ipp/lib/intel64 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mkl/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib/release /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/libfabric/lib /u/local/compilers/intel/2020.4/debugger_2020/libipt/intel64/lib /u/local/compilers/intel/2020.4/debugger_2020/python/intel64/lib"
 
 # Run-time system search path for libraries
-sys_lib_dlsearch_path_spec="/lib /usr/lib /usr/lib/libfakeroot /opt/hdf4/lib /usr/lib32 /usr/lib/octave/6.4.0 /usr/lib/opencollada /usr/lib/openmpi "
+sys_lib_dlsearch_path_spec="/lib /usr/lib /usr/lib/atlas-sse2 /usr/lib/atlas-sse3 /usr/lib64/atlas /usr/lib64//bind9-export/ /usr/lib64/mysql /usr/lib64/octave/3.8.2 /usr/lib64/tcl8.5/tclx8.4 "
 
 # Fix the shell variable $srcfile for the compiler.
 fix_srcfile_path=""
@@ -7331,7 +7331,7 @@ disable_libs=static
 # End:
 # ### BEGIN LIBTOOL TAG CONFIG: CXX
 
-# Libtool was configured on host voyager:
+# Libtool was configured on host login1:
 
 # Shell to use when invoking shell scripts.
 SHELL="/bin/sh"
@@ -7369,13 +7369,13 @@ AR="ar"
 AR_FLAGS="cru"
 
 # A C compiler.
-LTCC="gcc"
+LTCC="/bin/gcc"
 
 # LTCC compiler flags.
 LTCFLAGS="-g -O2"
 
 # A language-specific compiler.
-CC="g++"
+CC="/bin/g++"
 
 # Is the compiler the GNU C compiler?
 with_gcc=yes
@@ -7458,7 +7458,7 @@ dlopen_self=unknown
 dlopen_self_static=unknown
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag="-static"
+link_static_flag=""
 
 # Compiler flag to turn off builtin functions.
 no_builtin_flag=" -fno-builtin"
@@ -7513,11 +7513,11 @@ striplib="strip --strip-unneeded"
 
 # Dependencies to place before the objects being linked to create a
 # shared library.
-predep_objects="/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/../../../../lib/crti.o /usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/crtbeginS.o"
+predep_objects="/usr/lib/gcc/x86_64-redhat-linux/4.8.5/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/4.8.5/crtbeginS.o"
 
 # Dependencies to place after the objects being linked to create a
 # shared library.
-postdep_objects="/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/crtendS.o /usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/../../../../lib/crtn.o"
+postdep_objects="/usr/lib/gcc/x86_64-redhat-linux/4.8.5/crtendS.o /usr/lib/gcc/x86_64-redhat-linux/4.8.5/../../../../lib64/crtn.o"
 
 # Dependencies to place before the objects being linked to create a
 # shared library.
@@ -7529,11 +7529,11 @@ postdeps="-lstdc++ -lm -lgcc_s -lc -lgcc_s"
 
 # The directories searched by this compiler when creating a shared
 # library
-compiler_lib_search_dirs="/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0 /usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/../../../../lib /lib/../lib /usr/lib/../lib /usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/../../.."
+compiler_lib_search_dirs="/usr/lib/gcc/x86_64-redhat-linux/4.8.5 /usr/lib/gcc/x86_64-redhat-linux/4.8.5/../../../../lib64 /lib/../lib64 /usr/lib/../lib64 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/compiler/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/daal/../tbb/lib/intel64_lin/gcc4.8 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/daal/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/ipp/../tbb/lib/intel64/gcc4.8 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/ipp/lib/intel64 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mkl/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib/release /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/libfabric/lib /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/tbb/lib/intel64/gcc4.8 /u/local/compilers/intel/2020.4/debugger_2020/libipt/intel64/lib /u/local/compilers/intel/2020.4/debugger_2020/python/intel64/lib /usr/lib/gcc/x86_64-redhat-linux/4.8.5/../../.."
 
 # The library search path used internally by the compiler when linking
 # a shared library.
-compiler_lib_search_path="-L/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0 -L/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/../../../../lib -L/lib/../lib -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/../../.."
+compiler_lib_search_path="-L/usr/lib/gcc/x86_64-redhat-linux/4.8.5 -L/usr/lib/gcc/x86_64-redhat-linux/4.8.5/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/compiler/lib/intel64_lin -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/daal/../tbb/lib/intel64_lin/gcc4.8 -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/daal/lib/intel64_lin -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/ipp/../tbb/lib/intel64/gcc4.8 -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/ipp/lib/intel64 -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mkl/lib/intel64_lin -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib/release -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/libfabric/lib -L/u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/tbb/lib/intel64/gcc4.8 -L/u/local/compilers/intel/2020.4/debugger_2020/libipt/intel64/lib -L/u/local/compilers/intel/2020.4/debugger_2020/python/intel64/lib -L/usr/lib/gcc/x86_64-redhat-linux/4.8.5/../../.."
 
 # Method to check whether dependent libraries are shared objects.
 deplibs_check_method="pass_all"
@@ -7613,10 +7613,10 @@ variables_saved_for_relink="PATH LD_LIBRARY_PATH LD_RUN_PATH GCC_EXEC_PREFIX COM
 link_all_deplibs=unknown
 
 # Compile-time system search path for libraries
-sys_lib_search_path_spec="/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0 /usr/lib /lib"
+sys_lib_search_path_spec="/usr/lib/gcc/x86_64-redhat-linux/4.8.5 /usr/lib64 /lib64 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/compiler/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/tbb/lib/intel64_lin/gcc4.8 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/daal/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/tbb/lib/intel64/gcc4.8 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/ipp/lib/intel64 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mkl/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib/release /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/libfabric/lib /u/local/compilers/intel/2020.4/debugger_2020/libipt/intel64/lib /u/local/compilers/intel/2020.4/debugger_2020/python/intel64/lib"
 
 # Run-time system search path for libraries
-sys_lib_dlsearch_path_spec="/lib /usr/lib /usr/lib/libfakeroot /opt/hdf4/lib /usr/lib32 /usr/lib/octave/6.4.0 /usr/lib/opencollada /usr/lib/openmpi "
+sys_lib_dlsearch_path_spec="/lib /usr/lib /usr/lib/atlas-sse2 /usr/lib/atlas-sse3 /usr/lib64/atlas /usr/lib64//bind9-export/ /usr/lib64/mysql /usr/lib64/octave/3.8.2 /usr/lib64/tcl8.5/tclx8.4 "
 
 # Fix the shell variable $srcfile for the compiler.
 fix_srcfile_path=""
@@ -7640,7 +7640,7 @@ include_expsyms=""
 
 # ### BEGIN LIBTOOL TAG CONFIG: F77
 
-# Libtool was configured on host voyager:
+# Libtool was configured on host login1:
 
 # Shell to use when invoking shell scripts.
 SHELL="/bin/sh"
@@ -7678,7 +7678,7 @@ AR="ar"
 AR_FLAGS="cru"
 
 # A C compiler.
-LTCC="gcc"
+LTCC="/bin/gcc"
 
 # LTCC compiler flags.
 LTCFLAGS="-g -O2"
@@ -7925,10 +7925,10 @@ variables_saved_for_relink="PATH LD_LIBRARY_PATH LD_RUN_PATH GCC_EXEC_PREFIX COM
 link_all_deplibs=unknown
 
 # Compile-time system search path for libraries
-sys_lib_search_path_spec="/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0 /usr/lib /lib"
+sys_lib_search_path_spec="/usr/lib/gcc/x86_64-redhat-linux/4.8.5 /usr/lib64 /lib64 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/compiler/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/tbb/lib/intel64_lin/gcc4.8 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/daal/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/tbb/lib/intel64/gcc4.8 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/ipp/lib/intel64 /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mkl/lib/intel64_lin /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/lib/release /u/local/compilers/intel/2020.4/compilers_and_libraries_2020.4.304/linux/mpi/intel64/libfabric/lib /u/local/compilers/intel/2020.4/debugger_2020/libipt/intel64/lib /u/local/compilers/intel/2020.4/debugger_2020/python/intel64/lib"
 
 # Run-time system search path for libraries
-sys_lib_dlsearch_path_spec="/lib /usr/lib /usr/lib/libfakeroot /opt/hdf4/lib /usr/lib32 /usr/lib/octave/6.4.0 /usr/lib/opencollada /usr/lib/openmpi "
+sys_lib_dlsearch_path_spec="/lib /usr/lib /usr/lib/atlas-sse2 /usr/lib/atlas-sse3 /usr/lib64/atlas /usr/lib64//bind9-export/ /usr/lib64/mysql /usr/lib64/octave/3.8.2 /usr/lib64/tcl8.5/tclx8.4 "
 
 # Fix the shell variable $srcfile for the compiler.
 fix_srcfile_path=""

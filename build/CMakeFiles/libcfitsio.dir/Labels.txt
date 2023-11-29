@@ -1,0 +1,13 @@
+# Target labels
+ libcfitsio
+# Source files and their labels
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/CMakeFiles/libcfitsio
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/CMakeFiles/libcfitsio.rule
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/CMakeFiles/libcfitsio-complete.rule
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-build.rule
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-configure.rule
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-download.rule
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-install.rule
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-mkdir.rule
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-patch.rule
+/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-update.rule

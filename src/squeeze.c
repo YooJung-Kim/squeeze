@@ -1,4 +1,11 @@
 /*
+ * PLSQUEEZE - SQUEEZE modified to compute visibilities measured from fiber-fed & 
+ * complex extended apertures
+ * Author: Yoo Jung Kim
+*/
+
+
+/*
  *  SQUEEZE - Image reconstruction software for optical interferometry,
  *  based on Monte-Carlo Markov Chain algorithms.
  *

@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/CMakeFiles/libcfitsio"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/CMakeFiles/libcfitsio.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/CMakeFiles/libcfitsio-complete.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-build.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-configure.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-download.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-install.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-mkdir.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-patch.rule"
+		},
+		{
+			"file" : "/u/home/y/yjkim/project-mpfitz/PLsqueeze/squeeze/build/libcfitsio-prefix/src/libcfitsio-stamp/libcfitsio-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"libcfitsio"
+		],
+		"name" : "libcfitsio"
+	}
+}
