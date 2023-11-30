@@ -69,7 +69,7 @@ int model_vis(const double *params, double complex *modvis, double *lPriorModel,
             }
             else
                  vis_primary = 1.0 + 0*I;
-                 //printf("It's just 1\n");
+                
             // Compute fluxes
             f_primary = f_primary_ref ; //* pow(uv_lambda[i] / lambda_ref, -4.0); // Stellar flux primary
             f_bg = 0.0; //f_bg_ref * pow(uv_lambda[i] / lambda_ref, bg_ind);

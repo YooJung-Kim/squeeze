@@ -2,6 +2,10 @@
  * PLSQUEEZE - SQUEEZE modified to compute visibilities measured from fiber-fed & 
  * complex extended apertures
  * Author: Yoo Jung Kim
+ * 
+ * Currently only supports 6-port (15 baselines), monochromatic
+ * The default resolution is set to 65 x 65
+ * 
 */
 
 
@@ -219,10 +223,9 @@ int main(int argc, char **argv) {
   char pdummy_char[MAX_STRINGS];
   float pnullval;
 
-  printf("Try opening\n");
   if (fits_open_file(&pfptr, matrix_filename, READONLY, &pstatus))
     printerror(pstatus);
-  printf("FITS file opened\n");
+
   if (fits_read_key_lng(pfptr, "NAXIS", &pk, pdummy_char, &pstatus))
     printerror(pstatus);
 
@@ -884,7 +887,8 @@ int main(int argc, char **argv) {
     }
 
     // Set up the model vs image chromatic flux ratios (one for each uv point !)
-    for (i = 0; i < nuv; ++i) {
+    // MODIFIED
+    for (i = 0; i < axis_len*axis_len; ++i) {
       fluxratio_image[i] = 1.0;
       new_fluxratio_image[i] = 1.0;
     }
@@ -969,7 +973,7 @@ int main(int argc, char **argv) {
 
           for (j = 0; j < NREGULS; ++j)
             saved_reg_value[chain1 * NREGULS * niter + i / (nwavr * nelements) * NREGULS + j] = reg_value[j];
-        }
+        } // end of #pragma omp critical(savestate)
 
         if ((minimization_engine == ENGINE_PARALLEL_TEMPERING) && (i / (nwavr * nelements) > 0)) // note: prevent swapping states before the second iteration
         {
@@ -977,7 +981,8 @@ int main(int argc, char **argv) {
           // Marginal likelihood estimation -- Step 1 = compute likelihood expectation as MCMC averages
           lLikelihood_expectation[iChain] = 0;
           lLikelihood_deviation[iChain] = 0;
-#pragma omp barrier                                        // synchronize chains needed here to prevent swapping while computing the averages
+
+#pragma omp barrier   // synchronize chains needed here to prevent swapping while computing the averages
           if (i / (nwavr * nelements) > ceil(0.3 * niter)) // note: we need to check for burn-in info here instead
           {
             for (j = ceil(0.3 * niter); j < i / (nwavr * nelements); ++j) {
@@ -1012,7 +1017,7 @@ int main(int argc, char **argv) {
           //  printf("Chain %d is ready to switch -- now idle at iteration i= %ld\n", iChain, i);
           fflush(stdout);
           iMovedChain[chain1] = 0; // set all chains as ready to switch
-#pragma omp barrier
+#pragma omp barrier // synchronize
 #pragma omp critical(chainswap)
           {
             // Inter-chain  Metropolis-Hastings temperature swap
@@ -1297,8 +1302,11 @@ int main(int argc, char **argv) {
         model_vis(new_params, new_param_vis, &new_reg_value[REG_MODELPARAM], new_fluxratio_image, axis_len);
         prob_pmovement[j] *= 1.0 - 1.0 / PARAM_DAMPING_TIME;
         stepsize[j] *= 1.0 + (prob_pmovement[j] - TARGET_MPROB) / STEPSIZE_ADJUST_TIME;
-        for (j = 0; j < nuv; ++j)
+        
+        // MODIFIED
+        for (j = 0; j < axis_len*axis_len; ++j)
         {
+          // printf("fluxratio image %f new: %f new param vis: %f\n", fluxratio_image[j], new_fluxratio_image[j], new_param_vis[j]);
           new_im_vis[j] = im_vis[j] * new_fluxratio_image[j] / fluxratio_image[j];
           new_mod_vis[j] = new_im_vis[j] + new_param_vis[j];
         }
@@ -1882,7 +1890,7 @@ void vis_to_obs_PL(const double complex *__restrict mod_vis, double *__restrict 
   // }
 
   for (i=0; i<15; ++i){
-    mod_obs[i+6] = cabs(plvis[i]); //pow(pow(creal(plvis[i]), 2) + pow(cimag(plvis[i]), 2) , 0.5);
+    mod_obs[i+6] = cabs(plvis[i])*cabs(plvis[i]); //pow(pow(creal(plvis[i]), 2) + pow(cimag(plvis[i]), 2) , 0.5);
     //fprintf(ptestfile, "Squared visibility. %f\n", mod_obs[i+6]);
   }
 
@@ -2475,6 +2483,7 @@ void mcmc_writeoutput(char *file_basename, double *image, const int nchains, con
   double complex *mod_vis = malloc(axis_len*axis_len * sizeof(double complex));
   double complex *im_vis = malloc(axis_len*axis_len * sizeof(double complex));
   double complex *param_vis = malloc(axis_len*axis_len * sizeof(double complex));
+  
   double *fluxratio_image = malloc(axis_len * axis_len * sizeof(double));
   double lPriorModel = 0;
 
@@ -3017,6 +3026,8 @@ void compute_model_visibilities_fromelements_PL(double complex *mod_vis, double 
       int where = element_y[i] * axis_len + element_x[i];
       // add the contribution from the flux element to mutual intensity
       im_vis[j] += fftmatrix[j*axis_len*axis_len + where] / (double)nelements;}
+    // printf("visibility check: param_vis: %f, im_vis: %f, fluxratio_image: %f\n", param_vis[j], im_vis[j], fluxratio_image[j]);
+    // mod_vis[j] = param_vis[j] + im_vis[j] * fluxratio_image[j];
     mod_vis[j] = param_vis[j] + im_vis[j];
 
   }
@@ -3032,7 +3043,7 @@ void compute_model_visibilities_fromimage_PL(double complex *mod_vis, double com
   long i, j;
 
   if (nparams > 0){
-    
+    printf("========param 0: %lf", params[0]);
     model_vis(params, param_vis, lPriorModel, fluxratio_image, axis_len);}
   else
     for (j = 0; j < axis_len*axis_len; ++j)
@@ -3043,15 +3054,21 @@ void compute_model_visibilities_fromimage_PL(double complex *mod_vis, double com
       im_vis[j] += fftmatrix[j*axis_len*axis_len + i] * image[i];
     }
     mod_vis[j] = im_vis[j];
+    // printf("visibility check: mod_vis: %f + %f i\n", creal(mod_vis[j]), cimag(mod_vis[j]));
+
   }
 
   for (j = 0; j < axis_len*axis_len; ++j) {
     if (nparams > 0) {
 
-      im_vis[j] *= fluxratio_image[j];
+      printf("visibility check: param_vis: %f, im_vis: %f, fluxratio_image: %f\n", param_vis[j], im_vis[j], fluxratio_image[j]);
+
+      //Not sure about this
+      im_vis[j] *= (1-params[0]); //fluxratio_image[j]; //(1-params[0]); // fluxratio_image[j]; 
       mod_vis[j] = param_vis[j] + im_vis[j];
     } else
       mod_vis[j] = im_vis[j];
+    
   }
 }
 
