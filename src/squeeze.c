@@ -1307,6 +1307,8 @@ int main(int argc, char **argv) {
         for (j = 0; j < axis_len*axis_len; ++j)
         {
           // printf("fluxratio image %f new: %f new param vis: %f\n", fluxratio_image[j], new_fluxratio_image[j], new_param_vis[j]);
+          // if param flux ratio increased (more central star flux), less contribution from the circumstellar component.
+          // That depends on the ratio of the new and old flux ratios.
           new_im_vis[j] = im_vis[j] * new_fluxratio_image[j] / fluxratio_image[j];
           new_mod_vis[j] = new_im_vis[j] + new_param_vis[j];
         }
@@ -3061,9 +3063,10 @@ void compute_model_visibilities_fromimage_PL(double complex *mod_vis, double com
   for (j = 0; j < axis_len*axis_len; ++j) {
     if (nparams > 0) {
 
-      printf("visibility check: param_vis: %f, im_vis: %f, fluxratio_image: %f\n", param_vis[j], im_vis[j], fluxratio_image[j]);
+      // printf("visibility check: param_vis: %f, im_vis: %f, fluxratio_image: %f\n", param_vis[j], im_vis[j], fluxratio_image[j]);
 
-      //Not sure about this
+      // Not sure about this
+      // 
       im_vis[j] *= (1-params[0]); //fluxratio_image[j]; //(1-params[0]); // fluxratio_image[j]; 
       mod_vis[j] = param_vis[j] + im_vis[j];
     } else
